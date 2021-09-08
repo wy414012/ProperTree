@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# encoding: utf-8 
 import sys, os, plist, shutil, tempfile, subprocess
 if 2/3==0: input = raw_input
 
