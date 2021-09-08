@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# encoding: utf-8
 import sys, os, binascii, base64, json, re, subprocess
 from collections import OrderedDict
 try:
@@ -250,27 +251,27 @@ class ProperTree:
             # Setup the top level menu
             file_menu = tk.Menu(self.tk)
             main_menu = tk.Menu(self.tk)
-            main_menu.add_cascade(label="File", menu=file_menu)
-            file_menu.add_command(label="New (Cmd+N)", command=self.new_plist)
-            file_menu.add_command(label="Open (Cmd+O)", command=self.open_plist)
-            file_menu.add_command(label="Save (Cmd+S)", command=self.save_plist)
-            file_menu.add_command(label="Save As... (Cmd+Shift+S)", command=self.save_plist_as)
-            file_menu.add_command(label="Duplicate (Cmd+D)", command=self.duplicate_plist)
-            file_menu.add_command(label="Reload From Disk (Cmd+L)", command=self.reload_from_disk)
+            main_menu.add_cascade(label="菜 单", menu=file_menu)
+            file_menu.add_command(label="新窗口 (Cmd+N)", command=self.new_plist)
+            file_menu.add_command(label="打 开 (Cmd+O)", command=self.open_plist)
+            file_menu.add_command(label="保 存 (Cmd+S)", command=self.save_plist)
+            file_menu.add_command(label="保存全部... (Cmd+Shift+S)", command=self.save_plist_as)
+            file_menu.add_command(label="复 制 (Cmd+D)", command=self.duplicate_plist)
+            file_menu.add_command(label="从磁盘重新加载 (Cmd+L)", command=self.reload_from_disk)
             file_menu.add_separator()
-            file_menu.add_command(label="OC Snapshot (Cmd+R)", command=self.oc_snapshot)
-            file_menu.add_command(label="OC Clean Snapshot (Cmd+Shift+R)", command=self.oc_clean_snapshot)
+            file_menu.add_command(label="OC 快照 (Cmd+R)", command=self.oc_snapshot)
+            file_menu.add_command(label="OC 清洁快照 (Cmd+Shift+R)", command=self.oc_clean_snapshot)
             file_menu.add_separator()
-            file_menu.add_command(label="Convert Window (Cmd+T)", command=lambda:self.show_window(self.tk))
+            file_menu.add_command(label="转换窗口 (Cmd+T)", command=lambda:self.show_window(self.tk))
             file_menu.add_command(label="Strip Comments (Cmd+M)", command=self.strip_comments)
-            file_menu.add_command(label="Strip Disabled Entries (Cmd+E)", command=self.strip_disabled)
+            file_menu.add_command(label="删除禁用条目 (Cmd+E)", command=self.strip_disabled)
             file_menu.add_separator()
-            file_menu.add_command(label="Settings (Cmd+,)",command=lambda:self.show_window(self.settings_window))
+            file_menu.add_command(label="设 置 (Cmd+,)",command=lambda:self.show_window(self.settings_window))
             file_menu.add_separator()
-            file_menu.add_command(label="Toggle Find/Replace Pane (Cmd+F)",command=self.hide_show_find)
-            file_menu.add_command(label="Toggle Plist/Data/Int Type Pane (Cmd+P)",command=self.hide_show_type)
+            file_menu.add_command(label="切换查找/替换窗格 (Cmd+F)",command=self.hide_show_find)
+            file_menu.add_command(label="切换 Plist/Data/Int 类型面板 (Cmd+P)",command=self.hide_show_type)
             file_menu.add_separator()
-            file_menu.add_command(label="Quit (Cmd+Q)", command=self.quit)
+            file_menu.add_command(label="退 出 (Cmd+Q)", command=self.quit)
             self.tk.config(menu=main_menu)
 
         # Set bindings
