@@ -27,6 +27,7 @@ class ProperTree:
     def __init__(self, plists = []):
         # Create the new tk object
         self.tk = tk.Tk()
+        self.tk.withdraw() # Try to remove before it's drawn
         self.tk.title("Convert Values")
         self.tk.minsize(width=640,height=130)
         self.tk.resizable(True, False)
@@ -40,11 +41,25 @@ class ProperTree:
 
         # Create the settings window
         self.settings_window = tk.Toplevel(self.tk)
+        self.settings_window.withdraw() # Try to remove before it's drawn
         self.settings_window.title("ProperTree Settings")
         self.settings_window.resizable(False, False)
         self.settings_window.columnconfigure(0,weight=1)
         self.settings_window.columnconfigure(1,weight=1)
+        self.settings_window.columnconfigure(3,weight=1)
+        self.settings_window.columnconfigure(4,weight=1)
+
+        # Set the default max undo/redo steps to retain
+        self.max_undo = 200
+        
+        # Left side - functional elements:
+        
         # Let's add some checkboxes and stuffs
+        sep_func = ttk.Separator(self.settings_window,orient="horizontal")
+        sep_func.grid(row=0,column=1,columnspan=1,sticky="we",padx=10,pady=10)
+        func_label = tk.Label(self.settings_window,text="Functionality Options:")
+        func_label.grid(row=0,column=0,sticky="w",padx=10,pady=10)
+
         self.expand_on_open = tk.IntVar()
         self.use_xcode_data = tk.IntVar()
         self.sort_dict_keys = tk.IntVar()
@@ -56,73 +71,92 @@ class ProperTree:
         self.sort_check = tk.Checkbutton(self.settings_window,text="Ignore Dictionary Key Order",variable=self.sort_dict_keys,command=self.sort_command)
         self.ignore_case_check = tk.Checkbutton(self.settings_window,text="Ignore Case When Stripping Comments",variable=self.comment_ignore_case,command=self.ignore_case_command)
         self.check_string_check = tk.Checkbutton(self.settings_window,text="Check String Values When Stripping Comments",variable=self.comment_check_string,command=self.check_string_command)
-        self.expand_check.grid(row=0,column=0,columnspan=2,sticky="w",padx=10,pady=(10,0))
-        self.xcode_check.grid(row=1,column=0,columnspan=2,sticky="w",padx=10)
-        self.sort_check.grid(row=2,column=0,columnspan=2,sticky="w",padx=10)
-        self.ignore_case_check.grid(row=3,column=0,columnspan=2,sticky="w",padx=10)
-        self.check_string_check.grid(row=4,column=0,columnspan=2,sticky="w",padx=10)
+        self.expand_check.grid(row=1,column=0,columnspan=2,sticky="w",padx=10)
+        self.xcode_check.grid(row=2,column=0,columnspan=2,sticky="w",padx=10)
+        self.sort_check.grid(row=3,column=0,columnspan=2,sticky="w",padx=10)
+        self.ignore_case_check.grid(row=4,column=0,columnspan=2,sticky="w",padx=10)
+        self.check_string_check.grid(row=5,column=0,columnspan=2,sticky="w",padx=10)
         comment_prefix_label = tk.Label(self.settings_window,text="Comment Prefix (default is #):")
-        comment_prefix_label.grid(row=5,column=0,sticky="w",padx=10)
+        comment_prefix_label.grid(row=6,column=0,sticky="w",padx=10)
         self.comment_prefix_text = tk.Entry(self.settings_window)
-        self.comment_prefix_text.grid(row=5,column=1,sticky="we",padx=10)
+        self.comment_prefix_text.grid(row=6,column=1,sticky="we",padx=10)
         self.plist_type_string = tk.StringVar(self.settings_window)
         self.plist_type_menu = tk.OptionMenu(self.settings_window, self.plist_type_string, "XML","Binary", command=self.change_plist_type)
         plist_label = tk.Label(self.settings_window,text="Default New Plist Type:")
-        plist_label.grid(row=6,column=0,sticky="w",padx=10)
-        self.plist_type_menu.grid(row=6,column=1,sticky="we",padx=10)
+        plist_label.grid(row=7,column=0,sticky="w",padx=10)
+        self.plist_type_menu.grid(row=7,column=1,sticky="we",padx=10)
         self.data_type_string = tk.StringVar(self.settings_window)
         self.data_type_menu = tk.OptionMenu(self.settings_window, self.data_type_string, "Hex","Base64", command=self.change_data_type)
         data_label = tk.Label(self.settings_window,text="Data Display Default:")
-        data_label.grid(row=7,column=0,sticky="w",padx=10)
-        self.data_type_menu.grid(row=7,column=1,sticky="we",padx=10)
+        data_label.grid(row=8,column=0,sticky="w",padx=10)
+        self.data_type_menu.grid(row=8,column=1,sticky="we",padx=10)
         self.int_type_string = tk.StringVar(self.settings_window)
         self.int_type_menu = tk.OptionMenu(self.settings_window, self.int_type_string, "Decimal", "Hex", command=self.change_int_type)
         int_label = tk.Label(self.settings_window,text="Integer Display Default:")
-        int_label.grid(row=8,column=0,sticky="w",padx=10)
-        self.int_type_menu.grid(row=8,column=1,sticky="we",padx=10)
+        int_label.grid(row=9,column=0,sticky="w",padx=10)
+        self.int_type_menu.grid(row=9,column=1,sticky="we",padx=10)
         self.bool_type_string = tk.StringVar(self.settings_window)
         self.bool_type_menu = tk.OptionMenu(self.settings_window, self.bool_type_string, "True/False", "YES/NO", "On/Off", "1/0", command=self.change_bool_type)
         bool_label = tk.Label(self.settings_window,text="Boolean Display Default:")
-        bool_label.grid(row=9,column=0,sticky="w",padx=10)
-        self.bool_type_menu.grid(row=9,column=1,sticky="we",padx=10)
+        bool_label.grid(row=10,column=0,sticky="w",padx=10)
+        self.bool_type_menu.grid(row=10,column=1,sticky="we",padx=10)
         self.snapshot_string = tk.StringVar(self.settings_window)
         self.snapshot_menu = tk.OptionMenu(self.settings_window, self.snapshot_string, "Latest", command=self.change_snapshot_version)
         snapshot_label = tk.Label(self.settings_window,text="Snapshot OC Version:")
-        snapshot_label.grid(row=10,column=0,sticky="w",padx=10)
-        self.snapshot_menu.grid(row=10,column=1,sticky="we",padx=10)
+        snapshot_label.grid(row=11,column=0,sticky="w",padx=10)
+        self.snapshot_menu.grid(row=11,column=1,sticky="we",padx=10)
         self.schema_check = tk.Checkbutton(self.settings_window,text="Force Update Snapshot Schema",variable=self.force_schema,command=self.schema_command)
-        self.schema_check.grid(row=11,column=0,columnspan=2,sticky="w",padx=10)
-        sep = ttk.Separator(self.settings_window,orient="horizontal")
-        sep.grid(row=12,column=0,columnspan=2,sticky="we",padx=10,pady=10)
-        r1_label = tk.Label(self.settings_window,text="Alternating Row Color #1:")
-        r1_label.grid(row=13,column=0,sticky="w",padx=10)
-        self.r1_canvas = tk.Canvas(self.settings_window, height=20, width=30, background="black", relief="groove", bd=2)
-        self.r1_canvas.grid(row=13,column=1,sticky="we",padx=10)
-        r2_label = tk.Label(self.settings_window,text="Alternating Row Color #2:")
-        r2_label.grid(row=14,column=0,sticky="w",padx=10)
-        self.r2_canvas = tk.Canvas(self.settings_window, height=20, width=30, background="black", relief="groove", bd=2)
-        self.r2_canvas.grid(row=14,column=1,sticky="we",padx=10)
-        r3_label = tk.Label(self.settings_window,text="Background Color:")
-        r3_label.grid(row=15,column=0,sticky="w",padx=10)
-        self.bg_canvas = tk.Canvas(self.settings_window, height=20, width=30, background="black", relief="groove", bd=2)
-        self.bg_canvas.grid(row=15,column=1,sticky="we",padx=10)
+        self.schema_check.grid(row=12,column=0,columnspan=2,sticky="w",padx=10)
+        self.drag_label = tk.Label(self.settings_window,text="Drag Dead Zone (1-100 pixels):")
+        self.drag_label.grid(row=13,column=0,sticky="w",padx=10)
+        self.drag_scale = tk.Scale(self.settings_window,from_=1,to=100,orient=tk.HORIZONTAL)
+        self.drag_scale.grid(row=13,column=1,sticky="we",padx=10)
+        undo_max_label = tk.Label(self.settings_window,text="Max Undo (0=unlim, {}=default):".format(self.max_undo))
+        undo_max_label.grid(row=14,column=0,sticky="w",padx=10)
+        self.undo_max_text = tk.Entry(self.settings_window)
+        self.undo_max_text.grid(row=14,column=1,sticky="we",padx=10)
+        
+        # Left/right separator:
+        sep = ttk.Separator(self.settings_window,orient="vertical")
+        sep.grid(row=1,column=2,rowspan=13,sticky="ns",padx=10)
+
+        # Right side - theme elements:
+        t_func = ttk.Separator(self.settings_window,orient="horizontal")
+        t_func.grid(row=0,column=4,columnspan=1,sticky="we",padx=10,pady=10)
+        tfunc_label = tk.Label(self.settings_window,text="Appearance Options:")
+        tfunc_label.grid(row=0,column=3,sticky="w",padx=10,pady=10)
+
         r4_label = tk.Label(self.settings_window,text="Highlight Color:")
-        r4_label.grid(row=16,column=0,sticky="w",padx=10)
+        r4_label.grid(row=1,column=3,sticky="w",padx=10)
         self.hl_canvas = tk.Canvas(self.settings_window, height=20, width=30, background="black", relief="groove", bd=2)
-        self.hl_canvas.grid(row=16,column=1,sticky="we",padx=10)
+        self.hl_canvas.grid(row=1,column=4,sticky="we",padx=10)
+        r1_label = tk.Label(self.settings_window,text="Alternating Row Color #1:")
+        r1_label.grid(row=2,column=3,sticky="w",padx=10)
+        self.r1_canvas = tk.Canvas(self.settings_window, height=20, width=30, background="black", relief="groove", bd=2)
+        self.r1_canvas.grid(row=2,column=4,sticky="we",padx=10)
+        r2_label = tk.Label(self.settings_window,text="Alternating Row Color #2:")
+        r2_label.grid(row=3,column=3,sticky="w",padx=10)
+        self.r2_canvas = tk.Canvas(self.settings_window, height=20, width=30, background="black", relief="groove", bd=2)
+        self.r2_canvas.grid(row=3,column=4,sticky="we",padx=10)
+        r3_label = tk.Label(self.settings_window,text="Column Header/BG Color:")
+        r3_label.grid(row=4,column=3,sticky="w",padx=10)
+        self.bg_canvas = tk.Canvas(self.settings_window, height=20, width=30, background="black", relief="groove", bd=2)
+        self.bg_canvas.grid(row=4,column=4,sticky="we",padx=10)
+        self.ig_bg_check = tk.IntVar()
+        self.ig_bg = tk.Checkbutton(self.settings_window,text="Header Text Ignores BG Color",variable=self.ig_bg_check,command=self.check_ig_bg_command)
+        self.ig_bg.grid(row=5,column=3,sticky="w",padx=10)
+        self.bg_inv_check = tk.IntVar()
+        self.bg_inv = tk.Checkbutton(self.settings_window,text="Invert Header Text Color",variable=self.bg_inv_check,command=self.check_bg_invert_command)
+        self.bg_inv.grid(row=5,column=4,sticky="w",padx=10)
         self.r1_inv_check = tk.IntVar()
         self.r1_inv = tk.Checkbutton(self.settings_window,text="Invert Row #1 Text Color",variable=self.r1_inv_check,command=self.check_r1_invert_command)
-        self.r1_inv.grid(row=17,column=1,sticky="w",padx=10)
+        self.r1_inv.grid(row=6,column=4,sticky="w",padx=10)
         self.r2_inv_check = tk.IntVar()
         self.r2_inv = tk.Checkbutton(self.settings_window,text="Invert Row #2 Text Color",variable=self.r2_inv_check,command=self.check_r2_invert_command)
-        self.r2_inv.grid(row=18,column=1,sticky="w",padx=10)
+        self.r2_inv.grid(row=7,column=4,sticky="w",padx=10)
         self.hl_inv_check = tk.IntVar()
         self.hl_inv = tk.Checkbutton(self.settings_window,text="Invert Highlight Text Color",variable=self.hl_inv_check,command=self.check_hl_invert_command)
-        self.hl_inv.grid(row=19,column=1,sticky="w",padx=10)
-        self.drag_label = tk.Label(self.settings_window,text="Drag Dead Zone (1-100 pixels):")
-        self.drag_label.grid(row=20,column=0,sticky="w",padx=10)
-        self.drag_scale = tk.Scale(self.settings_window,from_=1,to=100,orient=tk.HORIZONTAL)
-        self.drag_scale.grid(row=20,column=1,sticky="we",padx=10)
+        self.hl_inv.grid(row=8,column=4,sticky="w",padx=10)
 
         self.default_font = Font(font='TkTextFont')
         self.custom_font = tk.IntVar()
@@ -130,8 +164,8 @@ class ProperTree:
         self.font_string = tk.StringVar()
         self.font_spinbox = tk.Spinbox(self.settings_window,from_=1,to=128,textvariable=self.font_string)
         self.font_string.trace("w",self.update_font)
-        self.font_check.grid(row=21,column=0,sticky="w",padx=10)
-        self.font_spinbox.grid(row=21,column=1,sticky="we",padx=10)
+        self.font_check.grid(row=9,column=3,sticky="w",padx=10)
+        self.font_spinbox.grid(row=9,column=4,sticky="we",padx=10)
 
         # Custom font picker - wacky implementation.
         self.font_var = tk.IntVar()
@@ -140,21 +174,26 @@ class ProperTree:
         self.font_custom = ttk.Combobox(self.settings_window,state="readonly",textvariable=self.font_family,values=sorted(families()))
         self.font_custom.bind('<<ComboboxSelected>>',self.font_pick)
         self.font_family.trace("w",self.update_font_family)
-        self.font_custom_check.grid(row=22,column=0,stick="w",padx=10)
-        self.font_custom.grid(row=22,column=1,sticky="we",padx=10)
+        self.font_custom_check.grid(row=10,column=3,stick="w",padx=10)
+        self.font_custom.grid(row=10,column=4,sticky="we",padx=10)
+
+        r5_label = tk.Label(self.settings_window,text="Restore Default Colors:")
+        r5_label.grid(row=11,column=3,sticky="w",padx=10)
+        dt_func = ttk.Separator(self.settings_window,orient="horizontal")
+        dt_func.grid(row=11,column=4,columnspan=1,sticky="we",padx=10)
+
+        default_high = tk.Button(self.settings_window,text="Highlight Color",command=lambda:self.swap_colors("highlight"))
+        default_high.grid(row=12,column=4,sticky="we",padx=10)
+        default_light = tk.Button(self.settings_window,text="Light Mode Colors",command=lambda:self.swap_colors("light"))
+        default_light.grid(row=13,column=4,sticky="we",padx=10)
+        default_dark = tk.Button(self.settings_window,text="Dark Mode Colors",command=lambda:self.swap_colors("dark"))
+        default_dark.grid(row=14,column=4,sticky="we",padx=10)
 
         sep_theme = ttk.Separator(self.settings_window,orient="horizontal")
-        sep_theme.grid(row=23,column=0,columnspan=2,sticky="we",padx=10,pady=10)
-        r5_label = tk.Label(self.settings_window,text="Default Theme Options:")
-        r5_label.grid(row=24,column=0,sticky="w",padx=10)
-        default_high = tk.Button(self.settings_window,text="Reset Highlight",command=lambda:self.swap_colors("highlight"))
-        default_high.grid(row=25,column=0,sticky="we",padx=10)
-        default_light = tk.Button(self.settings_window,text="Light Mode Defaults",command=lambda:self.swap_colors("light"))
-        default_light.grid(row=24,column=1,sticky="we",padx=10)
-        default_dark = tk.Button(self.settings_window,text="Dark Mode Defaults",command=lambda:self.swap_colors("dark"))
-        default_dark.grid(row=25,column=1,sticky="we",padx=10)
-        reset_settings = tk.Button(self.settings_window,text="Reset All To Defaults",command=self.reset_settings)
-        reset_settings.grid(row=26,column=1,sticky="we",padx=10,pady=10)
+        sep_theme.grid(row=15,column=0,columnspan=5,sticky="we",padx=10,pady=(10,0))
+        
+        reset_settings = tk.Button(self.settings_window,text="Restore All Defaults",command=self.reset_settings)
+        reset_settings.grid(row=16,column=4,sticky="we",padx=10,pady=10)
 
         # Setup the color picker click methods
         self.r1_canvas.bind("<ButtonRelease-1>",lambda x:self.pick_color("alternating_color_1",self.r1_canvas))
@@ -164,6 +203,7 @@ class ProperTree:
 
         # Setup some canvas connections
         self.canvas_connect = {
+            self.bg_canvas: {"invert":self.bg_inv_check},
             self.r1_canvas: {"invert":self.r1_inv_check},
             self.r2_canvas: {"invert":self.r2_inv_check},
             self.hl_canvas: {"invert":self.hl_inv_check}
@@ -174,6 +214,7 @@ class ProperTree:
             "alternating_color_2":"#202020",
             "highlight_color":"#1E90FF",
             "background_color":"#161616",
+            "invert_background_text_color":False,
             "invert_row1_text_color":False,
             "invert_row2_text_color":False
         }
@@ -182,6 +223,7 @@ class ProperTree:
             "alternating_color_2":"#FEFEFE",
             "highlight_color":"#1E90FF",
             "background_color":"#FEFEFE",
+            "invert_background_text_color":False,
             "invert_row1_text_color":False,
             "invert_row2_text_color":False
         }
@@ -247,9 +289,6 @@ class ProperTree:
 
         self.tk.protocol("WM_DELETE_WINDOW", self.close_window)
         self.settings_window.protocol("WM_DELETE_WINDOW", self.close_window)
-        # Close initial windows
-        self.tk.withdraw()
-        self.settings_window.withdraw()
 
         self.default_windows = (self.tk,self.settings_window)
 
@@ -285,20 +324,21 @@ class ProperTree:
 
         # Set bindings
         # on at least macOS, tk 8.5 works with <Command-Z>, but 8.6 requires <Shift-Command-z>
+        # Can be bypassed by including both Shift and the capital letter
         self.tk.bind("<{}-w>".format(key), self.close_window)
         self.settings_window.bind("<{}-w>".format(key), self.close_window)
         self.tk.bind_all("<{}-n>".format(key), self.new_plist)
         self.tk.bind_all("<{}-o>".format(key), self.open_plist)
         self.tk.bind_all("<{}-s>".format(key), self.save_plist)
-        self.tk.bind_all("<Shift-{}-s>".format(key) if tk.TkVersion >= 8.6 and str(sys.platform)=="darwin" else "<{}-S>".format(key), self.save_plist_as)
+        self.tk.bind_all("<{}-Shift-S>".format(key), self.save_plist_as)
         self.tk.bind_all("<{}-d>".format(key), self.duplicate_plist)
         self.tk.bind_all("<{}-t>".format(key), lambda event, x=self.tk: self.show_window(x))
         self.tk.bind_all("<{}-z>".format(key), self.undo)
-        self.tk.bind_all("<Shift-{}-z>".format(key) if tk.TkVersion >= 8.6 and str(sys.platform)=="darwin" else "<{}-Z>".format(key), self.redo)
+        self.tk.bind_all("<{}-Shift-Z>".format(key), self.redo)
         self.tk.bind_all("<{}-m>".format(key), self.strip_comments)
         self.tk.bind_all("<{}-e>".format(key), self.strip_disabled)
         self.tk.bind_all("<{}-r>".format(key), self.oc_snapshot)
-        self.tk.bind_all("<Shift-{}-r>".format(key) if tk.TkVersion >= 8.6 and str(sys.platform)=="darwin" else "<{}-R>".format(key), self.oc_clean_snapshot)
+        self.tk.bind_all("<{}-Shift-R>".format(key), self.oc_clean_snapshot)
         self.tk.bind_all("<{}-l>".format(key), self.reload_from_disk)
         if not str(sys.platform) == "darwin":
             # Rewrite the default Command-Q command
@@ -310,29 +350,32 @@ class ProperTree:
         #
         # Load the settings - current available settings are:
         # 
-        # last_window_width:          width value (default is 640)
-        # last_window_height:         height value (default is 480)
-        # expand_all_items_on_open:   bool
-        # sort_dict:                  bool, false = OrderedDict
-        # xcode_data:                 bool, true = <data>XXXX</data>, false = different lines
-        # comment_strip_prefix:       string, defaults to #
-        # comment_strip_ignore_case:  bool, true = ignore case when stripping comments
-        # comment_strip_check_string: bool, true = consider string values as well as keys
-        # new_plist_default_type:     string, XML/Binary
-        # display_data_as:            string, Hex/Base64
-        # display_int_as:             string, Decimal/Hex
-        # snapshot_version:           string, X.X.X version number, or Latest
-        # force_snapshot_schema:      bool
-        # alternating_color_1:        string, Dark: #161616 - Light: #F0F1F1
-        # alternating_color_2:        string, Dark: #202020 - Light: #FEFEFE
-        # highlight_color:            string, Dark: #1E90FF - Light: #1E90FF
-        # background_color:           string, Dark: #161616 - Light: #FEFEFE
-        # invert_row1_text_color:     bool
-        # invert_row2_text_color:     bool
-        # invert_hl_text_color:       bool
-        # drag_dead_zone:             pixel distance before drag starts (default is 20)
-        # open_recent:                list, paths recently opened
-        # recent_max:                 int, max number of recent items
+        # last_window_width:            width value (default is 640)
+        # last_window_height:           height value (default is 480)
+        # expand_all_items_on_open:     bool
+        # sort_dict:                    bool, false = OrderedDict
+        # xcode_data:                   bool, true = <data>XXXX</data>, false = different lines
+        # comment_strip_prefix:         string, defaults to #
+        # comment_strip_ignore_case:    bool, true = ignore case when stripping comments
+        # comment_strip_check_string:   bool, true = consider string values as well as keys
+        # new_plist_default_type:       string, XML/Binary
+        # display_data_as:              string, Hex/Base64
+        # display_int_as:               string, Decimal/Hex
+        # snapshot_version:             string, X.X.X version number, or Latest
+        # force_snapshot_schema:        bool
+        # alternating_color_1:          string, Dark: #161616 - Light: #F0F1F1
+        # alternating_color_2:          string, Dark: #202020 - Light: #FEFEFE
+        # highlight_color:              string, Dark: #1E90FF - Light: #1E90FF
+        # background_color:             string, Dark: #161616 - Light: #FEFEFE
+        # header_text_ignore_bg_color:  bool
+        # invert_background_text_color: bool
+        # invert_row1_text_color:       bool
+        # invert_row2_text_color:       bool
+        # invert_hl_text_color:         bool
+        # drag_dead_zone:               pixel distance before drag starts (default is 20)
+        # open_recent:                  list, paths recently opened
+        # recent_max:                   int, max number of recent items
+        # max_undo:                     int, max undo history - 0 = unlimited
         #
 
         self.settings = {}
@@ -364,11 +407,19 @@ class ProperTree:
         # Normalize the pathing for Open Recents
         self.normpath_recents()
         if str(sys.platform) == "darwin": self.update_recents()
-        
-        # Wait before opening a new document to see if we need to.
-        # This was annoying to debug, but seems to work.
-        self.tk.after(250, lambda:self.check_open(plists))
         self.check_dark_mode()
+
+        # Prior implementations tried to wait 250ms to give open_plist_from_app()
+        # enough time to parse anything double-clicked.  The issue was that both
+        # check_open() and open_plist_from_app() would fire at roughly the same
+        # time - resulting in one opening a blank doc, and the other opening the
+        # double-clicked plist(s).  We now use the is_opening lock to determine
+        # if one function is currently working - and the other will check in 5ms
+        # intervals until the lock is lifted before processing.  This allows us
+        # to overtake a blank doc opened by one with the other - hopefully fixing
+        # the issue of multiple documents spawning on double-click in macOS.
+        self.is_opening = False
+        self.check_open(plists)
 
         # Start our run loop
         tk.mainloop()
@@ -393,6 +444,17 @@ class ProperTree:
             self.update_settings()
         # Continue the loop
         self.tk.after(10000, lambda:self.check_dark_mode())
+
+    def should_set_header_text(self):
+        # In macOS, the header colors are only affected by the background
+        # when in dark mode on specific python build
+        # We'll try to get the system's actual dark mode here
+        if str(sys.platform) != "darwin": return True # Don't make changes on Windows/Linux
+        try:
+            # Ask the window if it's in dark mode - only works when supported
+            return bool(self.tk.call("tk::unsupported::MacWindowStyle","isdark",self.tk))
+        except Exception as e:
+            return False # If this fails, window doesn't support dark mode
 
     def get_dark(self):
         if os.name=="nt":
@@ -441,6 +503,14 @@ class ProperTree:
 
     def check_string_command(self, event = None):
         self.settings["comment_strip_check_string"] = True if self.comment_check_string.get() else False
+
+    def check_ig_bg_command(self, event = None):
+        self.settings["header_text_ignore_bg_color"] = True if self.ig_bg_check.get() else False
+        self.update_colors()
+
+    def check_bg_invert_command(self, event = None):
+        self.settings["invert_background_text_color"] = True if self.bg_inv_check.get() else False
+        self.update_colors()
 
     def check_r1_invert_command(self, event = None):
         self.settings["invert_row1_text_color"] = True if self.r1_inv_check.get() else False
@@ -575,6 +645,10 @@ class ProperTree:
         prefix = self.settings.get("comment_strip_prefix","#")
         prefix = "#" if not prefix else prefix
         self.comment_prefix_text.insert(0,prefix)
+        self.undo_max_text.delete(0,tk.END)
+        max_undo = self.settings.get("max_undo",self.max_undo)
+        max_undo = self.max_undo if not isinstance(max_undo,int) or max_undo < 0 else max_undo
+        self.undo_max_text.insert(0,str(max_undo))
         default_color = self.default_dark if self.use_dark else self.default_light
         color_1 = "".join([x for x in self.settings.get("alternating_color_1",default_color["alternating_color_1"]) if x.lower() in "0123456789abcdef"])
         color_2 = "".join([x for x in self.settings.get("alternating_color_2",default_color["alternating_color_2"]) if x.lower() in "0123456789abcdef"])
@@ -584,6 +658,8 @@ class ProperTree:
         self.r2_canvas.configure(background="#"+color_2 if len(color_2) == 6 else default_color["alternating_color_2"])
         self.hl_canvas.configure(background="#"+color_h if len(color_h) == 6 else default_color["highlight_color"])
         self.bg_canvas.configure(background="#"+color_b if len(color_b) == 6 else default_color["background_color"])
+        self.ig_bg_check.set(self.settings.get("header_text_ignore_bg_color",False))
+        self.bg_inv_check.set(self.settings.get("invert_background_text_color",False))
         self.r1_inv_check.set(self.settings.get("invert_row1_text_color",False))
         self.r2_inv_check.set(self.settings.get("invert_row2_text_color",False))
         self.hl_inv_check.set(self.settings.get("invert_hl_text_color",False))
@@ -598,7 +674,7 @@ class ProperTree:
 
     def update_canvas_text(self, canvas = None):
         if canvas == None: # Update all
-            canvas = (self.r1_canvas,self.r2_canvas,self.hl_canvas)
+            canvas = (self.bg_canvas,self.r1_canvas,self.r2_canvas,self.hl_canvas)
         if not isinstance(canvas, (tuple,list)): canvas = (canvas,)
         for c in canvas:
             if not c in self.canvas_connect: continue # Not a recognized canvas - skip
@@ -611,7 +687,14 @@ class ProperTree:
                 if w==1==h: # Request width as we haven't drawn yet
                     w = self.settings_window.winfo_reqwidth()
                     h = c.winfo_reqheight()
-                self.canvas_connect[c]["text_id"] = c.create_text((w-20)/2,h/2,text="Sample Text")
+                    cw = c.winfo_reqwidth()
+                    # Not drawn - estimate position and pad for macOS and Win/Linux with best-guess
+                    rw = int(w/2) if str(sys.platform)=="darwin" else int(w/2-cw/2)
+                else:
+                    # It's been drawn, calculate the new way - width of the widget/2 gives us the halfway point
+                    cw = c.winfo_width()
+                    rw = int(cw/2)
+                self.canvas_connect[c]["text_id"] = c.create_text(rw,int(h/2),text="Sample Text")
             # Set the color
             c.itemconfig(self.canvas_connect[c]["text_id"], fill=color)
 
@@ -702,42 +785,61 @@ class ProperTree:
         return self.pre_open_with_path(path)
 
     def check_open(self, plists = []):
-        plists = [x for x in plists if not self.regexp.search(x)]
-        if isinstance(plists, list) and len(plists):
-            at_least_one = False
-            # Iterate the passed plists and open them
-            for p in set(plists):
-                window = self.pre_open_with_path(p)
-                if not window: continue
-                at_least_one = True
-                if self.start_window == None:
-                    self.start_window = window
-            if not at_least_one: # Check if we have any other windows open - and close as needed
-                windows = self.stackorder(self.tk)
-                if not len(windows): self.quit()
-        elif not len(self.stackorder(self.tk)):
-            # create a fresh plist to start
-            self.start_window = self.new_plist()
+        if self.is_opening: # Already opening - loop until we're not
+            self.tk.after(5, lambda:self.check_open(plists))
+            return
+        self.is_opening = True
+        try:
+            plists = [x for x in plists if not self.regexp.search(x)]
+            if isinstance(plists, list) and len(plists):
+                at_least_one = False
+                # Iterate the passed plists and open them
+                for p in set(plists):
+                    window = self.pre_open_with_path(p)
+                    if not window: continue
+                    at_least_one = True
+                    if self.start_window == None:
+                        self.start_window = window
+                if not at_least_one: # If none of them opened, open a fresh plist
+                    windows = self.stackorder(self.tk)
+                    if not len(windows):
+                        self.start_window = self.new_plist()
+            elif not len(self.stackorder(self.tk)):
+                # create a fresh plist to start
+                self.start_window = self.new_plist()
+        except Exception as e:
+            self.tk.bell()
+            mb.showerror("Error in check_open() function",repr(e))
+        self.is_opening = False
 
     def open_plist_from_app(self, *args):
-        if isinstance(args, str):
-            args = [args]
-        args = [x for x in args if not self.regexp.search(x)]
-        for arg in args:
-            windows = self.stackorder(self.tk)
-            # Verify that no other window has that file selected already
-            existing_window = next((window for window in windows if not window in self.default_windows and window.current_plist==arg),None)
-            if existing_window:
-                self.lift_window(existing_window)
-                continue
-            if len(windows) == 1 and windows[0] == self.start_window and windows[0].edited == False and windows[0].current_plist == None:
-                # Fresh window - replace the contents
-                current_window = windows[0]
-            else:
-                current_window = None
-            # Let's load the plist
-            window = self.pre_open_with_path(arg,current_window)
-            if self.start_window == None: self.start_window = window
+        if self.is_opening: # Already opening - loop until we're not
+            self.tk.after(5, lambda:self.open_plist_from_app(*args))
+            return
+        self.is_opening = True
+        try:
+            if isinstance(args, str):
+                args = [args]
+            args = [x for x in args if not self.regexp.search(x)]
+            for arg in args:
+                windows = self.stackorder(self.tk)
+                # Verify that no other window has that file selected already
+                existing_window = next((window for window in windows if not window in self.default_windows and window.current_plist==arg),None)
+                if existing_window:
+                    self.lift_window(existing_window)
+                    continue
+                if len(windows) == 1 and windows[0] == self.start_window and windows[0].edited == False and windows[0].current_plist == None:
+                    # Fresh window - replace the contents
+                    current_window = windows[0]
+                else:
+                    current_window = None
+                # Let's load the plist
+                window = self.pre_open_with_path(arg,current_window)
+                if self.start_window == None: self.start_window = window
+        except Exception as e:
+            self.tk.bell()
+            mb.showerror("Error in open_plist_from_app() function",repr(e))
+        self.is_opening = False
 
     def change_hd_type(self, value):
         self.hd_type = value
@@ -801,9 +903,12 @@ class ProperTree:
         if len(windows):
             windows[-1].withdraw()
             windows = windows[:-1]
-        if check_close and not len(windows):
+        if not len(windows):
             # Quit if all windows are closed
-            self.quit()
+            if check_close: self.quit()
+        else:
+            # Bring the last window forward
+            self.lift_window(windows[-1])
 
     def strip_comments(self, event = None):
         windows = self.stackorder(self.tk)
@@ -949,9 +1054,11 @@ class ProperTree:
         if window in self.default_windows:
             return
         plist_data = window.nodes_to_values()
-        new_window = plistwindow.PlistWindow(self, self.tk).open_plist(None,plist_data)
+        new_window = plistwindow.PlistWindow(self, self.tk)
+        new_window.open_plist(None,plist_data)
         # Update the Open Recent menu
         if str(sys.platform) != "darwin": self.update_recents_for_target(new_window)
+        self.lift_window(new_window)
 
     def save_plist(self, event = None):
         windows = self.stackorder(self.tk)
@@ -964,6 +1071,7 @@ class ProperTree:
         if window.save_plist(event):
             # Saved correctly, let's ensure the path is saved in recents
             self.add_recent(window.current_plist)
+            self.lift_window(window)
     
     def save_plist_as(self, event = None):
         windows = self.stackorder(self.tk)
@@ -976,6 +1084,7 @@ class ProperTree:
         if window.save_plist_as(event):
             # Saved correctly, let's ensure the path is saved in recents
             self.add_recent(window.current_plist)
+            self.lift_window(window)
 
     def undo(self, event = None):
         windows = self.stackorder(self.tk)
@@ -1100,6 +1209,12 @@ class ProperTree:
         prefix = self.comment_prefix_text.get()
         prefix = "#" if not prefix else prefix
         self.settings["comment_strip_prefix"] = prefix
+        try:
+            max_undo = int(self.undo_max_text.get())
+            assert max_undo >= 0
+        except:
+            max_undo = self.max_undo
+        self.settings["max_undo"] = max_undo
         self.settings["drag_dead_zone"] = self.drag_scale.get()
         # Actually quit the tkinter session
         self.tk.destroy()
