@@ -1308,9 +1308,8 @@ class PlistWindow(tk.Toplevel):
                             drivers_list.append(os.path.join(path,name)[len(oc_drivers):].replace("\\", "/").lstrip("/")) # Strip the /Volumes/EFI/
                         else:
                             new_driver_entry = {
-                                "Arguments": "",
+                                # "Arguments": "",
                                 "Enabled":True,
-                                "Comment":name,
                                 "Path":os.path.join(path,name)[len(oc_drivers):].replace("\\", "/").lstrip("/") # Strip the /Volumes/EFI/
                             }
                             # Add our snapshot custom entries, if any - include the name of the .efi driver if the Comment
