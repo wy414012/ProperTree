@@ -77,7 +77,7 @@ def gather_python(show_all=False,path_list=None):
 def select_py(py_versions,min_tk,pt_current):
     current = next((x[0] for x in py_versions if x[0] == pt_current),None)
     while True:
-        output = " - Currently Available Python Versions -\n\n"
+        output = " - 当前可用的 Python 版本 -\n\n"
         for i,x in enumerate(py_versions,1):
             output += "{}. {}{}{}{}\n".format(
                 i,
@@ -88,14 +88,14 @@ def select_py(py_versions,min_tk,pt_current):
             )
         output += "\n"
         if current: output += "C. Current ({})\n".format(current)
-        output += "Q. Quit\n"
+        output += "Q. 退出\n"
         # Gather our width and height and resize the window if needed
         w = max((len(x) for x in output.split("\n")))
         h = len(output.split("\n"))+1
         print('\033[8;{};{}t'.format(h if h > 24 else 24, w if w > 80 else 80))
         os.system("clear")
         print(output)
-        menu = input("Please select the python version to use{}:  ".format(" (default is C)" if current else "")).lower()
+        menu = input("请选择你需要使用的Python 版本{}:  ".format(" (default is C)" if current else "")).lower()
         if not len(menu):
             if current: menu = "c"
             else: continue
@@ -122,25 +122,25 @@ def main(use_current=False,path_list=None):
                     # Got a shebang - save it
                     pt_current = pt[0][2:]
         except: pass
-    print("Locating python versions...")
+    print("定位 python 版本...")
     if use_current: # Override any passed path_list with our current if needed
         if not pt_current:
-            print(" - No current ProperTree python version detected!  Aborting!")
+            print(" - 未检测到当前的 ProperTree python 版本！ 中止")
             exit(1)
         path_list = pt_current
     py_versions = gather_python(min_only_suggestion,path_list)
     if not py_versions:
-        print(" - No python installs with functioning tk found!  Aborting!")
+        print(" - 没有找到运行正常的 tk 的 python 安装！ 中止！")
         exit(1)
     min_tk = get_min_tk_version()
     py_version = py_versions[0] if len(py_versions) == 1 else select_py(py_versions,min_tk,pt_current)
     os.system("clear")
-    print("Building .app with the following python install:")
+    print("使用以下 python 安装构建 .app:")
     print(" - {}".format(py_version[0]))
     print(" --> {}".format(py_version[1]))
     print(" --> tk {}".format(py_version[2]))
     pypath = py_version[0]
-    print("Checking for existing ProperTree.app...")
+    print("检查现有的 ProperTree.app...")
     if os.path.exists("ProperTree.app"):
         print(" - Found, removing...")
         if os.path.exists("ProperTree.app/Contents/MacOS/Scripts/settings.json"):
@@ -149,10 +149,10 @@ def main(use_current=False,path_list=None):
             shutil.copy("ProperTree.app/Contents/MacOS/Scripts/settings.json", os.path.join(temp, "settings.json"))
         shutil.rmtree("ProperTree.app")
     # Make the directory structure
-    print("Creating bundle structure...")
+    print("创建捆绑结构...")
     os.makedirs("ProperTree.app/Contents/MacOS/Scripts")
     os.makedirs("ProperTree.app/Contents/Resources")
-    print("Copying scripts...")
+    print("复制脚本...")
     print(" - ProperTree.py -> ProperTree.command")
     with open("ProperTree.py","r") as f:
         ptcom = f.read().split("\n")
