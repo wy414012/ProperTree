@@ -41,9 +41,10 @@ jobs:
         run: brew install python@3.10
 
       - name: 安装依赖
-        run: |
-        pip3 install pyinstaller
-        pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts:Scripts" ProperTree.py
+        run: pip3 install pyinstaller
+       
+      - name: 构建
+        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts:Scripts" ProperTree.py
 
       - name: 打包上传工作件
         uses: actions/upload-artifact@v2
