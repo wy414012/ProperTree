@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys, os, plistlib, base64, binascii, datetime, tempfile, shutil, re, itertools, math, hashlib
+import sys, os, plistlib, base64, binascii, datetime, tempfile, shutil, re, subprocess, math, hashlib
 from collections import OrderedDict
 try:
     # Python 2
@@ -63,12 +63,16 @@ class EntryPopup(tk.Entry):
         self.bind("<Tab>", lambda x:[self.reveal(x),self.next_field(x)])
         self.bind("<FocusOut>", self.focus_out)
 
+        # Lock to avoid prematurely cancelling on focus_out
+        self.confirming = False
+
     def reveal(self, event=None):
         # Make sure we're visible if editing
         self.parent.see(self.cell)
         self.relocate()
 
     def focus_out(self, event=None):
+        if self.confirming: return # Don't do anything if we're still confirming
         if self.master.focus_get():
             # Pass True as the event to allow the bell() when our window still
             # has focus (means we're actively editing)
@@ -141,14 +145,13 @@ class EntryPopup(tk.Entry):
             get = ""
         if not len(get):
             return 'break'
-        self.clipboard_clear()
-        self.clipboard_append(get)
+        self.master._clipboard_append(get)
         self.update()
         return 'break'
 
     def paste(self, event=None):
         try:
-            contents = self.clipboard_get()
+            contents = self.master.clipboard_get()
         except:
             contents = ""
         if len(contents):
@@ -171,9 +174,15 @@ class EntryPopup(tk.Entry):
         # returns 'break' to interrupt default key-bindings
         return 'break'
 
+    def confirm_clear_and_focus(self):
+        # Helper to clear confirming, then focus the widget
+        self.confirming = False
+        return self.focus_force()
+
     def confirm(self, event=None, no_prompt = False):
         if not self.winfo_exists():
             return
+        self.confirming = True # Lock confirming
         if self.column == "#0":
             # First we make sure that no other siblings
             # have the same name - as dict names need to be
@@ -192,7 +201,7 @@ class EntryPopup(tk.Entry):
                     if no_prompt or not mb.askyesno("Invalid Key Name","That key name already exists in that dict.\n\nWould you like to keep editing?",parent=self.parent):
                         return self.cancel(event)
                     # no_prompt is false and we wanted to continue editing - set focus again and return
-                    return self.focus_force()
+                    return self.confirm_clear_and_focus()
             # Add to undo stack
             self.master.add_undo({"type":"edit","cell":self.cell,"text":self.parent.item(self.cell,"text"),"values":self.parent.item(self.cell,"values")})
             # No matches, should be safe to set
@@ -220,7 +229,7 @@ class EntryPopup(tk.Entry):
                 if no_prompt or not mb.askyesno(output[1],output[2]+"\n\nWould you like to keep editing?",parent=self.parent):
                     return self.cancel(event)
                 # no_prompt is false and we wanted to continue editing - set focus again and return
-                return self.focus_force()
+                return self.confirm_clear_and_focus()
             # Set the value to the new output
             value = output[1]
             # Add to undo stack
@@ -378,7 +387,6 @@ class PlistWindow(tk.Toplevel):
         self._tree.bind("<BackSpace>", self.remove_row)
         self._tree.bind("<Return>", self.start_editing)
         self._tree.bind("<KP_Enter>", self.start_editing)
-        self._tree.bind("<Escape>", self.deselect)
         self.bind("<FocusIn>", self.got_focus)
 
         self.recent_menu = None
@@ -873,11 +881,6 @@ class PlistWindow(tk.Toplevel):
         # If we got here - start over
         self.select(matches[0][1])
         return match[0]
-
-    def deselect(self, event=None):
-        # Clear the table selection
-        for x in self._tree.selection():
-            self._tree.selection_remove(x)
 
     def start_editing(self, event = None):
         # Get the currently selected row, if any
@@ -2032,6 +2035,28 @@ class PlistWindow(tk.Toplevel):
             self.destroy()
         return True
 
+    def _clipboard_append(self, clipboard_string = None):
+        # Tkinter has issues copying to the system clipboard as evident in this bug report:
+        # https://bugs.python.org/issue40452
+        #
+        # There are some workarounds that require compiling a new tk binary - but we can
+        # ensure the system clipboard is updated by calling either clip or pbcopy depending
+        # on the current OS.
+        #
+        # First we clear the tkinter clipboard
+        self.clipboard_clear()
+        # Only write to the tkinter clipboard if we have a value
+        if clipboard_string: self.clipboard_append(clipboard_string)
+        else: clipboard_string = "" # Ensure we have at least an empty string
+        # Gather our args for the potential clipboard commands Windows -> macOS -> Linux
+        for args in (["clip"],) if os.name=="nt" else (["pbcopy"],) if sys.platform=="darwin" else (["xclip","-sel","c"],["xsel","-ib"],):
+            # Try to start a subprocess to mirror the tkinter clipboard contents
+            try: clipboard = subprocess.Popen(args,stdin=subprocess.PIPE)
+            except: continue
+            # Dirty py2 check to see if we need to encode the data or not
+            clipboard.stdin.write(clipboard_string if 2/3==0 else clipboard_string.encode("utf-8"))
+            break # Break out of the loop as needed
+
     def copy_selection(self, event = None):
         node = self._tree.focus()
         if node == "":
@@ -2042,8 +2067,7 @@ class PlistWindow(tk.Toplevel):
             if self.controller.settings.get("xcode_data",True):
                 clipboard_string = self._format_data_string(clipboard_string)
             # Get just the values
-            self.clipboard_clear()
-            self.clipboard_append(clipboard_string)
+            self._clipboard_append(clipboard_string)
         except:
             pass
 
@@ -2061,8 +2085,7 @@ class PlistWindow(tk.Toplevel):
                 # Set it to the first item of the array
                 plist_data = plist_data[0]
             clipboard_string = plist.dumps(plist_data,sort_keys=self.controller.settings.get("sort_dict",False))
-            self.clipboard_clear()
-            self.clipboard_append(clipboard_string)
+            self._clipboard_append(clipboard_string)
         except:
             pass
 
@@ -2072,8 +2095,7 @@ class PlistWindow(tk.Toplevel):
             if self.controller.settings.get("xcode_data",True):
                 clipboard_string = self._format_data_string(clipboard_string)
             # Get just the values
-            self.clipboard_clear()
-            self.clipboard_append(clipboard_string)
+            self._clipboard_append(clipboard_string)
         except:
             pass
 
