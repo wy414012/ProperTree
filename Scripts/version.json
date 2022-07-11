@@ -1,4 +1,4 @@
 {
-    "version": "0.0.7",
-    "changes": "Fix issue with confirmation dialog cancelling edits."
+    "version": "0.0.9",
+    "changes": "Fixed an issue with negative ints when displayed as hex.\nAdjusted the wording/formatting of the update notification."
 }
