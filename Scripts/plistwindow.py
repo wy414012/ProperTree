@@ -990,6 +990,21 @@ class PlistWindow(tk.Toplevel):
         if not paths_too_long: return [] # Return an empty array to allow .extend()
         return [(item,name,paths_too_long)] # Return a list containing a tuple of the original item, and which paths are too long
 
+    def get_hash(self,path,block_size=65536):
+        if not os.path.exists(path):
+            return ""
+        hasher = hashlib.md5()
+        try:
+            with open(path,"rb") as f:
+                while True:
+                    buffer = f.read(block_size)
+                    if not buffer: break
+                    hasher.update(buffer)
+            return hasher.hexdigest()
+        except:
+            pass
+        return "" # Couldn't determine hash :(
+
     def oc_snapshot(self, event = None, clean = False):
         target_dir = os.path.dirname(self.current_plist) if self.current_plist and os.path.exists(os.path.dirname(self.current_plist)) else None
         oc_folder = fd.askdirectory(title="Select OC Folder:",initialdir=target_dir)
@@ -1020,23 +1035,17 @@ class PlistWindow(tk.Toplevel):
         for x in (oc_acpi,oc_drivers,oc_kexts):
             if not os.path.exists(x):
                 self.bell()
-                mb.showerror("Incorrect OC Folder Struction", "{} does not exist.".format(x), parent=self)
+                mb.showerror("Incorrect OC Folder Structure", "{} does not exist.\nPlease make sure you're selecting a valid OC folder.".format(x), parent=self)
                 return
             if x != oc_efi and not os.path.isdir(x):
                 self.bell()
-                mb.showerror("Incorrect OC Folder Struction", "{} exists, but is not a directory.".format(x), parent=self)
+                mb.showerror("Incorrect OC Folder Structure", "{} exists, but is not a directory.\nPlease make sure you're selecting a valid OC folder.".format(x), parent=self)
                 return
 
         # Folders are valid - lets work through each section
 
         # Let's get the hash of OpenCore.efi, compare to a known list, and then compare that version to our snapshot_version if found
-        hasher = hashlib.md5()
-        try:
-            with open(oc_efi,"rb") as f:
-                hasher.update(f.read())
-            oc_hash = hasher.hexdigest()
-        except:
-            oc_hash = "" # Couldn't determine hash :(
+        oc_hash = self.get_hash(oc_efi)
         # Let's get the version of the snapshot that matches our target, and that matches our hash if any
         latest_snap = {} # Highest min_version
         target_snap = {} # Matches our hash
@@ -1198,9 +1207,9 @@ class PlistWindow(tk.Toplevel):
         for x in new_kexts:
             x = next((y for y in kext_list if y[0].get("BundlePath","") == x.get("BundlePath","")),None)
             if not x: continue
-            parents = [next((z for z in new_kexts if z.get("BundlePath","") == y[0].get("BundlePath","")),[]) for y in kext_list if y[1].get("CFBundleIdentifier",None) in x[1].get("OSBundleLibraries",[])]
+            parents = [next(((z,y[1]) for z in new_kexts if z.get("BundlePath","") == y[0].get("BundlePath","")),[]) for y in kext_list if y[1].get("CFBundleIdentifier",None) in x[1].get("OSBundleLibraries",[])]
             children = [next((z for z in new_kexts if z.get("BundlePath","") == y[0].get("BundlePath","")),[]) for y in kext_list if x[1].get("CFBundleIdentifier",None) in y[1].get("OSBundleLibraries",[])]
-            parents = [y for y in parents if not y in children and not y.get("BundlePath","") == x[0].get("BundlePath","")]
+            parents = [y for y in parents if not y[0] in children and not y[0].get("BundlePath","") == x[0].get("BundlePath","")]
             unordered_kexts.append({
                 "kext":x[0],
                 "parents":parents
@@ -1210,8 +1219,18 @@ class PlistWindow(tk.Toplevel):
         while len(unordered_kexts): # This could be dangerous if things aren't properly prepared above
             kext = unordered_kexts.pop(0)
             if len(kext["parents"]):
-                disabled_parents.extend([x.get("BundlePath","") for x in kext["parents"] if x.get("Enabled",True) == False and not x.get("BundlePath","") in disabled_parents])
-                if not all(x in ordered_kexts for x in kext["parents"]):
+                # Gather a list of enabled/disabled parents - and ensure we properly populate
+                # our disabled_parents list
+                enabled_parents = [x[1].get("CFBundleIdentifier") for x in kext["parents"] if x[0].get("Enabled")]
+                disabled_add = [x for x in kext["parents"] if x[0].get("Enabled") == False and not x[1].get("CFBundleIdentifier") in enabled_parents and not any((x[1].get("CFBundleIdentifier")==y[1].get("CFBundleIdentifier") for y in disabled_parents))]
+                for p in kext["parents"]:
+                    p_cf = p[1].get("CFBundleIdentifier")
+                    if not p_cf: continue # Broken - can't check
+                    if p_cf in enabled_parents: continue # Already have an enabled copy
+                    if any((p_cf == x[1].get("CFBundleIdentifier") for x in disabled_parents)):
+                        continue # Already have a warning copy
+                    disabled_parents.append(p)
+                if not all(x[0] in ordered_kexts for x in kext["parents"]):
                     unordered_kexts.append(kext)
                     continue
             ordered_kexts.append(next(x for x in new_kexts if x.get("BundlePath","") == kext["kext"].get("BundlePath","")))
@@ -1231,9 +1250,9 @@ class PlistWindow(tk.Toplevel):
             if not mb.askyesno("Incorrect Kext Load Order","Correct the following kext load inheritance issues?\n\n{}".format("\n".join(rearranged)),parent=self):
                 ordered_kexts = original_kexts # We didn't want to update it
         if len(disabled_parents):
-            if mb.askyesno("Disabled Parent Kexts","Enable the following disabled parent kexts?\n\n{}".format("\n".join(disabled_parents)),parent=self):
+            if mb.askyesno("Disabled Parent Kexts","Enable the following disabled parent kexts?\n\n{}".format("\n".join([x[0].get("BundlePath","") for x in disabled_parents])),parent=self):
                 for x in ordered_kexts: # Walk our kexts and enable the parents
-                    if x.get("BundlePath","") in disabled_parents: x["Enabled"] = True
+                    if any((x.get("BundlePath","") == y[0].get("BundlePath","") for y in disabled_parents)): x["Enabled"] = True
         # Finally - we walk the kexts and ensure that we're not loading the same CFBundleIdentifier more than once
         enabled_kexts = []
         duplicate_bundles = []
@@ -1979,6 +1998,13 @@ class PlistWindow(tk.Toplevel):
                     f.write(plist_text)
             # Copy the temp over
             shutil.copy(temp_file,path)
+            # Let's ensure the md5 of the temp file and saved file are the same
+            # There have been some reports of file issues when saving directly to an ESP
+            temp_hash = self.get_hash(temp_file)
+            save_hash = self.get_hash(path)
+            if not temp_hash == save_hash: # Some issue occurred - let's throw an exception
+                self.bell()
+                mb.showerror("Saved MD5 Hash Mismatch","The saved and temp file hashes do not match - which suggests that copying from the temp directory to the destination was unsuccessful.\n\nIf the destination volume is an ESP, try first saving to your Desktop, then copying the file over manually.",parent=self)
         except Exception as e:
             # Had an issue, throw up a display box
             self.bell()
