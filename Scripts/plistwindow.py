@@ -389,6 +389,16 @@ class PlistWindow(tk.Toplevel):
         self._tree.bind("<KP_Enter>", self.start_editing)
         self.bind("<FocusIn>", self.got_focus)
 
+        # Set type and bool bindings
+        self._tree.bind("<{}-Up>".format(key), lambda x:self.cycle_type(increment=False))
+        self._tree.bind("<{}-Down>".format(key), lambda x:self.cycle_type(increment=True))
+        self._tree.bind("<{}-Left>".format(key), self.cycle_bool)
+        self._tree.bind("<{}-Right>".format(key), self.cycle_bool)
+
+        # Set expansion bindings
+        self._tree.bind("<Shift-Right>", lambda x:self.expand_children())
+        self._tree.bind("<Shift-Left>", lambda x:self.collapse_children())
+
         self.recent_menu = None
         # Setup menu bar (hopefully per-window) - only happens on non-mac systems
         if not str(sys.platform) == "darwin":
@@ -2026,6 +2036,8 @@ class PlistWindow(tk.Toplevel):
                 shutil.rmtree(temp,ignore_errors=True)
             except:
                 pass
+        # Normalize the path as needed
+        path = os.path.normpath(path) if path else path
         # Retain the new path if the save worked correctly
         self.current_plist = path
         # Set the window title to the path
@@ -2039,7 +2051,7 @@ class PlistWindow(tk.Toplevel):
         self.plist_type_string.set(plist_type)
         self._tree.delete(*self._tree.get_children())
         self.add_node(plist_data)
-        self.current_plist = path
+        self.current_plist = os.path.normpath(path) if path else path
         if path == None:
             self.title("Untitled.plist - Edited")
             self.edited = True
@@ -2061,13 +2073,9 @@ class PlistWindow(tk.Toplevel):
         if self.saving or self.check_save() == None:
             # User cancelled or we failed to save, bail
             return None
-        # See if we're the only window left, and close the session after
-        windows = self.controller.stackorder(self.root)
-        if len(windows) == 1 and windows[0] == self:
-            # Last and closing
-            self.controller.close_window(event,check_close=check_close)
-        else:
-            self.destroy()
+        # Destroy our current window - and initiate a check in the controller
+        self.destroy()
+        if check_close: self.controller.check_close()
         return True
 
     def _clipboard_append(self, clipboard_string = None):
@@ -2493,6 +2501,34 @@ class PlistWindow(tk.Toplevel):
             # Only updating the "text" field
             self._tree.item(child,text=x)
 
+    def cycle_bool(self, event=None):
+        cell = "" if not len(self._tree.selection()) else self._tree.selection()[0]
+        value = self.get_check_type(cell)
+        if not value.lower() == "boolean":
+            return "break"
+        bool_val = self.get_value_from_node(cell)
+        self.set_bool(self.b_false() if bool_val else self.b_true())
+        return "break"
+
+    def cycle_type(self, increment = True):
+        # Set our type to the next in the list
+        cell = "" if not len(self._tree.selection()) else self._tree.selection()[0]
+        value = self.get_check_type(cell)
+        menu = self.root_type_menu if cell in ("",self.get_root_node()) else self.type_menu
+        curr,end = menu.index(value),menu.index(tk.END)
+        if end is None or curr is None: return "break" # Menu is janked?
+        mod = 1 if increment else -1
+        next_index = curr # default to our current index
+        for x in range(2):
+            # Apply the modifier and check type
+            next_index = (next_index+mod) % (end+1)
+            if menu.type(next_index) == "command": break
+        if menu.type(next_index) != "command":
+            return "break" # Never found one, bail.
+        # Invoke the original command
+        menu.invoke(next_index)
+        return "break" # Prevent the keypress from cascading
+
     def change_type(self, value, cell = None):
         # Need to walk the values and pad
         if cell == None:
@@ -2887,6 +2923,7 @@ class PlistWindow(tk.Toplevel):
         for node in nodes:
             self._tree.item(node,open=True)
         self.alternate_colors()
+        return "break" # Prevent keybinds from propagating further
 
     def collapse_children(self):
         # Get all children of the selected node
@@ -2896,6 +2933,7 @@ class PlistWindow(tk.Toplevel):
         for node in nodes:
             self._tree.item(node,open=False)
         self.alternate_colors()
+        return "break" # Prevent keybinds from propagating further
 
     def tree_click_event(self, event):
         # close previous popups
