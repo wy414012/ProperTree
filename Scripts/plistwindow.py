@@ -31,6 +31,7 @@ class EntryPopup(tk.Entry):
     def __init__(self, parent, master, text, cell, column, **kw):
         tk.Entry.__init__(self, parent, **kw)
 
+        self.original_text = text
         self.insert(0, text)
         self.select_all() 
         self['state'] = 'normal'
@@ -179,6 +180,12 @@ class EntryPopup(tk.Entry):
         self.confirming = False
         return self.focus_force()
 
+    def check_edited(self, value):
+        # Make sure we're Edited if the value is different
+        if value != self.original_text and not self.master.edited:
+            self.master.edited = True
+            self.master.title(self.master.title()+" - Edited")
+
     def confirm(self, event=None, no_prompt = False):
         if not self.winfo_exists():
             return
@@ -206,6 +213,8 @@ class EntryPopup(tk.Entry):
             self.master.add_undo({"type":"edit","cell":self.cell,"text":self.parent.item(self.cell,"text"),"values":self.parent.item(self.cell,"values")})
             # No matches, should be safe to set
             self.parent.item(self.cell, text=self.get())
+            # Make sure we check if we're edited
+            self.check_edited(text)
         else:
             # Need to walk the values and pad
             values = self.parent.item(self.cell)["values"] or []
@@ -238,6 +247,8 @@ class EntryPopup(tk.Entry):
             values[index-1] = value
             # Set the values
             self.parent.item(self.cell, values=values)
+            # Make sure we check if we're edited
+            self.check_edited(value.replace("<","").replace(">","") if type_value.lower() == "data" else value)
         # Call cancel to close the popup as we're done editing
         self.cancel(event)
 
@@ -1736,9 +1747,13 @@ class PlistWindow(tk.Toplevel):
         if not self.clicked_drag:
             # Nope, ignore
             return
+        target = self.get_root_node() if not len(self._tree.selection()) else self._tree.selection()[0]
+        if target == self.get_root_node(): return # Nothing to do here as we can't drag it
         if self.drag_start == None:
-            # Let's set the drag start
+            # Let's set the drag start globals
             self.drag_start = (event.x, event.y)
+            self.drag_undo = None
+            self.dragging = True
             return
         # Find how far we've drug so far
         if not self.dragging:
@@ -1747,7 +1762,14 @@ class PlistWindow(tk.Toplevel):
             if drag_distance < self.controller.drag_scale.get():
                 # Not drug enough
                 return
-        move_to = self._tree.index(self._tree.identify_row(event.y))
+        # Save a reference to the item
+        if not self.drag_undo:
+            self.drag_undo = {"from":self._tree.parent(target),"index":self._tree.index(target),"name":self._tree.item(target,"text")}
+        # Make sure if we drag to the bottom, it stays at the bottom
+        if self._tree.identify_region(event.x, event.y) == "nothing" and not event.y < 5:
+            move_to = len(self.iter_nodes())
+        else:
+            move_to = self._tree.index(self._tree.identify_row(event.y))
         tv_item = self._tree.identify('item', event.x, event.y)
         tv_item = self.get_root_node() if tv_item == "" else tv_item # Force Root node as needed
         if not self.get_check_type(tv_item).lower() in ("dictionary","array") or not self._tree.item(tv_item,"open"):
@@ -1770,33 +1792,21 @@ class PlistWindow(tk.Toplevel):
             else:
                 # Just below should add it at item 0
                 move_to = 0
-        target = self.get_root_node() if not len(self._tree.selection()) else self._tree.selection()[0]
-        if target == self.get_root_node(): return # Nothing to do here as we can't drag it
         # Retain the open state, and make sure the selected node is closed
         if self.drag_open == None: self.drag_open = self._tree.item(target,"open")
         if self._tree.item(target,"open"): self._tree.item(target,open=False)
         if self._tree.index(target) == move_to and tv_item == target:
             # Already the same
             return
-        # Make sure if we drag to the bottom, it stays at the bottom
-        if self._tree.identify_region(event.x, event.y) == "nothing" and not event.y < 5:
-            move_to = len(self.iter_nodes())
-        # Save a reference to the item
-        if not self.drag_undo:
-            self.drag_undo = {"from":self._tree.parent(target),"index":self._tree.index(target),"name":self._tree.item(target,"text")}
         try:
             self._tree.move(target, tv_item, move_to)
         except:
             pass
         else:
-            if not self.edited:
-                self.edited = True
-                self.title(self.title()+" - Edited")
-            self.dragging = True
             self.alternate_colors()
 
     def confirm_drag(self, event):
-        if not self.dragging:
+        if not self.dragging or not self.drag_undo:
             return
         self.dragging = False
         self.drag_start = None
@@ -1804,6 +1814,13 @@ class PlistWindow(tk.Toplevel):
         self._tree.item(target,open=self.drag_open)
         self.drag_open = None
         node = self._tree.parent(target)
+        # Make sure we actually moved it somewhere
+        if self.drag_undo["from"] == node and self.drag_undo["index"] == self._tree.index(target):
+            return # Didn't actually move it - bail
+        # We moved it - make sure it shows as edited
+        if not self.edited:
+            self.edited = True
+            self.title(self.title()+" - Edited")
         # Finalize the drag undo
         undo_tasks = []
         # Add the move command
@@ -2586,6 +2603,7 @@ class PlistWindow(tk.Toplevel):
     def set_bool(self, value):
         # Need to walk the values and pad
         values = self.get_padded_values("" if not len(self._tree.selection()) else self._tree.selection()[0], 3)
+        if values[1] == value: return # Nothing to do, setting it to itself.
         cell = "" if not len(self._tree.selection()) else self._tree.selection()[0]
         self.add_undo({
             "type":"edit",
@@ -2994,15 +3012,12 @@ class PlistWindow(tk.Toplevel):
                 text = self._tree.item(rowid, 'values')[index-1]
             except:
                 text = ""
-        if index ==2 and t.lower() == "data":
+        if index == 2 and t.lower() == "data":
             # Special formatting of hex values
             text = text.replace("<","").replace(">","")
         # place Entry popup properly
         self.entry_popup = EntryPopup(self._tree, self, text, tv_item, column)
         self.entry_popup.relocate()
-        if not self.edited:
-            self.edited = True
-            self.title(self.title()+" - Edited")
         return 'break'
 
     ###                   ###
