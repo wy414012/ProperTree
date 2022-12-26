@@ -88,12 +88,12 @@ jobs:
         run: pip3 install pyinstaller && sudo apt-get install zip
    
       - name: 构建
-        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts:Scripts" -i ./Scripts/shortcut.ico ProperTree.py && zip -qr -FS ./dist/"ProperTree_linux_x86.zip" ./dist/*.exe
+        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts:Scripts" -i ./Scripts/shortcut.ico ProperTree.py && zip -qr -FS ./dist/"ProperTree_linux_x86.zip" ./dist/*
 
       - name: 打包上传工作件
         uses: actions/upload-artifact@v2
         with:
-          name: ProperTree_win
+          name: ProperTree_linux
           path: dist/*.zip
       - name: 上传发布版本
         if: github.event_name == 'release'
