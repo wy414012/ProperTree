@@ -44,13 +44,13 @@ jobs:
         run: pip3 install pyinstaller
    
       - name: 构建
-        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts:Scripts" ProperTree.py
+        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts:Scripts" -i ./Scripts/shortcut.icns ProperTree.py
 
       - name: 打包上传工作件
         uses: actions/upload-artifact@v2
         with:
           name: ProperTree_macos
-          path: dist/*
+          path: dist/*.app
 
   build-windows:
     name: python-latest-build
@@ -73,7 +73,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: ProperTree_win
-          path: dist/*
+          path: dist/*.exe
 #      - name: 上传发布版本
  #       if: github.event_name == 'release'
   #      uses: svenstaro/upload-release-action@483c1e56f95e88835747b1c7c60581215016cbf2
