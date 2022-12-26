@@ -52,17 +52,12 @@ jobs:
           name: ProperTree_macos
           path: dist/*.app
           
-      - name: 打包上传工作件
-        uses: actions/upload-artifact@v2
-        with:
-          name: ProperTree_win
-          path: dist/*.app
       - name: 上传发布版本
         if: github.event_name == 'release'
         uses: svenstaro/upload-release-action@483c1e56f95e88835747b1c7c60581215016cbf2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: dist/*.exe
+          file: dist/*.app
           tag: ${{ github.ref }}
           file_glob: true
           
