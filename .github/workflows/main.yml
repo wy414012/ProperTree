@@ -29,29 +29,51 @@ jobs:
           git fetch -p origin
           git for-each-ref --format 'delete %(refname)' refs/pull | git update-ref --stdin
           git push --mirror
- # build-macos:
- #   name: python-latest-build
- #   runs-on: macos-latest
- #   env:
- #     JOB_TYPE: BUILD
- #   steps:
- #     - uses: actions/checkout@v2
-#
- #     - name: 安装 python 3.10
-  #      run: brew install python@3.10
-#
- #     - name: 安装依赖
-  #      run: pip3 install pyinstaller
-   #
-    #  - name: 构建
-     #   run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts:Scripts" ProperTree.py
+  build-macos:
+    name: python-latest-build
+    runs-on: macos-latest
+    env:
+      JOB_TYPE: BUILD
+    steps:
+      - uses: actions/checkout@v3
 
-      #- name: 打包上传工作件
-       # uses: actions/upload-artifact@v2
-        #with:
-         # name: ProperTree_macos
-          #path: dist/*
+      - name: 检查python版本
+        run: python3 --version
 
+      - name: 安装依赖
+        run: pip3 install pyinstaller
+   
+      - name: 构建
+        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts:Scripts" ProperTree.py
+
+      - name: 打包上传工作件
+        uses: actions/upload-artifact@v2
+        with:
+          name: ProperTree_macos
+          path: dist/*
+
+  build-windows:
+    name: python-latest-build
+    runs-on: windows-latest
+    env:
+      JOB_TYPE: BUILD
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: 检查python版本
+        run: python3 --version
+
+      - name: 安装依赖
+        run: pip3 install pyinstaller
+   
+      - name: 构建
+        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts;Scripts" ProperTree.py
+
+      - name: 打包上传工作件
+        uses: actions/upload-artifact@v2
+        with:
+          name: ProperTree_win
+          path: dist/*
 #      - name: 上传发布版本
  #       if: github.event_name == 'release'
   #      uses: svenstaro/upload-release-action@483c1e56f95e88835747b1c7c60581215016cbf2

@@ -182,13 +182,13 @@ def main(use_current=False,path_list=None):
         shutil.copy(os.path.join("Scripts",x),target)
     print("Building Info.plist...")
     info = {
-        "CFBundleShortVersionString": "0.0", 
+        "CFBundleShortVersionString": "1.0",
         "CFBundleSignature": "????", 
         "CFBundleInfoDictionaryVersion": "0.0", 
         "CFBundleIconFile": "icon", 
-        "NSHumanReadableCopyright": "Copyright 2019 CorpNewt", 
+        "NSHumanReadableCopyright": "Copyright 20122 Yaming",
         "CFBundleIconFile": "shortcut.icns",
-        "CFBundleIdentifier": "com.corpnewt.ProperTree", 
+        "CFBundleIdentifier": "com.Yaming.ProperTree",
         "CFBundleDocumentTypes": [
             {
                 "CFBundleTypeName": "Property List", 
@@ -205,7 +205,7 @@ def main(use_current=False,path_list=None):
         "LSMinimumSystemVersion": "10.4",
         "LSMultipleInstancesProhibited": True,
         "CFBundlePackageType": "APPL", 
-        "CFBundleVersion": "0.0"
+        "CFBundleVersion": "1.0"
     }
     with open("ProperTree.app/Contents/Info.plist","wb") as f:
         plist.dump(info,f)

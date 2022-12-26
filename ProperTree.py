@@ -434,8 +434,8 @@ class ProperTree:
         self.dl_error = self.dl = None
         try: self.dl = downloader.Downloader()
         except Exception as e: self.dl_error = str(e) # Failed
-        self.version_url = "https://raw.githubusercontent.com/corpnewt/ProperTree/master/Scripts/version.json"
-        self.repo_url = "https://github.com/corpnewt/ProperTree"
+        self.version_url = "https://gitee.com/yaming-network/ProperTree/raw/Yaming/Scripts/version.json"
+        self.repo_url = "https://gitee.com/yaming-network/ProperTree"
 
         # Check for updates if need be
         if self.settings.get("check_for_updates_at_startup",True):
@@ -546,35 +546,35 @@ class ProperTree:
         except:
             if user_initiated:
                 self.tk.bell()
-                mb.showerror("An Error Occurred Checking For Updates","Could not get version data from github.  Potentially a network issue.")
+                mb.showerror("检查更新时出错","无法从gitee获取版本数据。可能是网络问题。")
             return
         try: version_dict = json.loads(newjson)
         except: version_dict = {}
         if not version_dict.get("version"):
             if user_initiated:
                 self.tk.bell()
-                mb.showerror("An Error Occurred Checking For Updates","Data returned was malformed or nonexistent.")
+                mb.showerror("检查更新时出错","返回的数据格式不正确或不存在。")
             return
-        # At this point - we should have json data containing the version key/value
+        # 此时，我们应该有包含版本密钥/值的json数据
         check_version = str(version_dict["version"]).lower()
         our_version   = str(self.version.get("version","0.0.0")).lower()
         notify_once   = self.settings.get("notify_once_per_version",True)
         last_version  = str(self.settings.get("last_version_checked","0.0.0")).lower()
         if self.compare_version(check_version,our_version) is True:
             if notify_once and last_version == check_version and not user_initiated:
-                # Already notified about this version - ignore
+                # 已通知此版本-忽略
                 return
-            # Save the last version checked
+            # 保存上次选中的版本
             self.settings["last_version_checked"] = check_version
             # We got an update we're not ignoring - let's prompt
             self.tk.bell()
             result = mb.askyesno(
-                title="New ProperTree Version Available",
-                message="Version {} is available (currently on {}).\n\nWhat's new in {}:\n{}\n\nVisit ProperTree's github repo now?".format(
+                title="新的ProperTree版本可用",
+                message="版本 {} 可用 (当前打开 {}).\n\n中的新功能 {}:\n{}\n\n立即访问ProperTree的gitee回购？".format(
                     check_version,
                     our_version,
                     check_version,
-                    version_dict.get("changes","No changes listed.")
+                    version_dict.get("changes","未列出任何更改。")
                 )
             )
             if result: # Open the url in the default browser
@@ -583,8 +583,8 @@ class ProperTree:
         elif user_initiated:
             # No new updates - but we need to tell the user
             mb.showinfo(
-                title="No Updates Available",
-                message="You are currently running the latest version of ProperTree ({}).".format(our_version)
+                title="无可用更新",
+                message="您当前正在运行最新版本的ProperTree ({}).".format(our_version)
             )
         # If we got here - we displayed some message, let's lift our window to the top
         windows = self.stackorder(self.tk,include_defaults=True)
