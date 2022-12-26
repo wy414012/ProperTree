@@ -67,7 +67,7 @@ jobs:
         run: pip3 install pyinstaller
    
       - name: 构建
-        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts;Scripts" ProperTree.py
+        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts;Scripts" ProperTree.py && chmod -R 777 ./dist/ProperTree.app
 
       - name: 打包上传工作件
         uses: actions/upload-artifact@v2
