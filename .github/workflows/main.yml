@@ -50,7 +50,7 @@ jobs:
         run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts:Scripts" -i ./Scripts/shortcut.icns ProperTree.py
 
       - name: 打包上传工作件
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2
         with:
           name: ProperTree_macos
           path: dist/*.app
