@@ -1,4 +1,4 @@
-name: CI
+name: gitee-mirror
 
 
 on:
@@ -32,65 +32,4 @@ jobs:
           git fetch -p origin
           git for-each-ref --format 'delete %(refname)' refs/pull | git update-ref --stdin
           git push --mirror
-  build-macos:
-    name: macos-python3-build
-    runs-on: macos-latest
-    env:
-      JOB_TYPE: BUILD
-    steps:
-      - uses: actions/checkout@v3
 
-      - name: 检查python版本
-        run: python3 --version
-
-      - name: 安装依赖
-        run: pip3 install pyinstaller
-   
-      - name: 构建
-        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts:Scripts" -i ./Scripts/shortcut.icns ProperTree.py && zip -qr -FS ./dist/"ProperTree_macos.zip" ./dist/*.app
-
-      - name: 打包上传工作件
-        uses: actions/upload-artifact@v2
-        with:
-          name: ProperTree_macos
-          path: dist/*.zip
-          
-      - name: 上传发布版本
-        if: github.event_name == 'release'
-        uses: svenstaro/upload-release-action@483c1e56f95e88835747b1c7c60581215016cbf2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: dist/*.zip
-          tag: ${{ github.ref }}
-          file_glob: true
-          
-  build-windows:
-    name: windows-python3-build
-    runs-on: windows-latest
-    env:
-      JOB_TYPE: BUILD
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: 检查python版本
-        run: python3 --version
-
-      - name: 安装依赖
-        run: pip3 install pyinstaller && choco install zip
-   
-      - name: 构建
-        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts;Scripts" -i ./Scripts/shortcut.ico ProperTree.py && zip -qr -FS ./dist/"ProperTree_win_x86.zip" ./dist/*.exe
-
-      - name: 打包上传工作件
-        uses: actions/upload-artifact@v2
-        with:
-          name: ProperTree_win
-          path: dist/*.zip
-      - name: 上传发布版本
-        if: github.event_name == 'release'
-        uses: svenstaro/upload-release-action@483c1e56f95e88835747b1c7c60581215016cbf2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: dist/*.zip
-          tag: ${{ github.ref }}
-          file_glob: true
