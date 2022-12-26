@@ -30,7 +30,7 @@ jobs:
           git for-each-ref --format 'delete %(refname)' refs/pull | git update-ref --stdin
           git push --mirror
   build-macos:
-    name: python-latest-build
+    name: macos-python3-build
     runs-on: macos-latest
     env:
       JOB_TYPE: BUILD
@@ -44,7 +44,7 @@ jobs:
         run: pip3 install pyinstaller
    
       - name: 构建
-        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts:Scripts" -i ./Scripts/shortcut.icns ProperTree.py
+        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts:Scripts" -i ./Scripts/shortcut.icns ProperTree.py && chmod -R 777 ./dist/ProperTree.app
 
       - name: 打包上传工作件
         uses: actions/upload-artifact@v2
@@ -53,12 +53,12 @@ jobs:
           path: dist/*.app
 
   build-windows:
-    name: python-latest-build
+    name: windows-python3-build
     runs-on: windows-latest
     env:
       JOB_TYPE: BUILD
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: 检查python版本
         run: python3 --version
@@ -67,7 +67,7 @@ jobs:
         run: pip3 install pyinstaller
    
       - name: 构建
-        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts;Scripts" ProperTree.py && chmod -R 777 ./dist/ProperTree.app
+        run: pyinstaller --clean --windowed --onedir --onefile --add-data "Scripts;Scripts" ProperTree.py
 
       - name: 打包上传工作件
         uses: actions/upload-artifact@v2
