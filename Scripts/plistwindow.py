@@ -3,7 +3,7 @@ import sys, os, plistlib, base64, binascii, datetime, tempfile, shutil, re, subp
 
 from collections import OrderedDict, deque
 from io import BytesIO
-from Scripts import config_tex_info
+from Scripts import config_tex_info, plist
 
 try:
     # Python 2
@@ -26,19 +26,23 @@ except ImportError:
     unicode = str
     basestring = str
     from io import StringIO
-from . import plist
 
 class EntryPlus(tk.Entry):
-    def __init__(self,parent,master,**kw):
+    def __init__(self,parent,master,controller,**kw):
         tk.Entry.__init__(self, parent, **kw)
 
         self.parent = parent
         self.master = master
+        self.controller = controller
 
         key = "Command" if str(sys.platform) == "darwin" else "Control"
         self.bind("<{}-a>".format(key), self.select_all)
         self.bind("<{}-c>".format(key), self.copy)
         self.bind("<{}-v>".format(key), self.paste)
+        self.bind("<Left>", self.goto_left)
+        self.bind("<Right>", self.goto_right)
+        self.bind("<Shift-Left>", self.select_left)
+        self.bind("<Shift-Right>", self.select_right)
         self.bind("<Shift-Up>", self.select_prior)
         self.bind("<Shift-Down>", self.select_after)
         self.bind("<Up>", self.goto_start)
@@ -50,18 +54,67 @@ class EntryPlus(tk.Entry):
         return 'break'
 
     def select_prior(self, *ignore):
-        self.selection_range(0,self.index(tk.INSERT))
+        try:
+            if self.index(tk.INSERT) == self.index(tk.SEL_LAST):
+                # Just set the cursor position
+                return self.goto_left_right()
+            else:
+                self.selection_range(0,tk.SEL_LAST)
+        except:
+            self.selection_range(0,self.index(tk.INSERT))
         self.icursor(0)
         return 'break'
 
     def select_after(self, *ignore):
-        self.selection_range(self.index(tk.INSERT),"end")
-        self.icursor("end")
+        try:
+            if self.index(tk.INSERT) == self.index(tk.SEL_FIRST):
+                # Just set the cursor position
+                return self.goto_left_right(left=False)
+            else:
+                self.selection_range(tk.SEL_FIRST,tk.END)
+        except:
+            self.selection_range(self.index(tk.INSERT),tk.END)
+        self.icursor(tk.END)
         return 'break'
 
+    def select_left_right(self, left=True):
+        # Check if we're at the left already, and if so
+        # just return
+        if (left and self.index(tk.INSERT) == 0) or \
+        (not left and self.index(tk.INSERT) == self.index(tk.END)):
+            return 'break'
+        # Get the baseline values
+        index = self.index(tk.INSERT)
+        try:
+            start = self.index(tk.SEL_FIRST)
+            end   = self.index(tk.SEL_LAST)
+        except:
+            # Default to the index
+            start = end = index
+        # Clamp the index
+        new_index = min(max(0,index - 1 if left else index + 1),self.index(tk.END))
+        # Figure out which we're updating
+        if index == start:
+            start = new_index
+        else:
+            end = new_index
+        # Set our selection
+        self.icursor(new_index)
+        self.selection_range(
+            min(start,end),
+            max(start,end)
+        )
+        return 'break'
+
+    def select_left(self, *ignore):
+        return self.select_left_right()
+
+    def select_right(self, *ignore):
+        return self.select_left_right(left=False)
+
     def select_all(self, *ignore):
-        self.selection_range(0,"end")
-        self.icursor("end")
+        self.selection_range(0,tk.END)
+        self.icursor(tk.END)
         # returns 'break' to interrupt default key-bindings
         return 'break'
 
@@ -72,8 +125,34 @@ class EntryPlus(tk.Entry):
 
     def goto_end(self, event=None):
         self.selection_range(0, 0)
-        self.icursor("end")
+        self.icursor(tk.END)
         return 'break'
+
+    def goto_left_right(self, left=True):
+        try:
+            target = self.index(
+                tk.SEL_FIRST if left else tk.SEL_LAST
+            )
+            # We have some text selected, clear it
+            # and set the cursor at the left or right
+            # as needed
+            self.selection_range(0, 0)
+            self.icursor(target)
+        except:
+            # No selection - just move the cursor
+            # to the left or right if possible
+            if left:
+                cursor = max(0,self.index(tk.INSERT)-1)
+            else:
+                cursor = min(len(self.get()),self.index(tk.INSERT)+1)
+            self.icursor(cursor)
+        return 'break'
+
+    def goto_left(self, event=None):
+        return self.goto_left_right()
+
+    def goto_right(self, event=None):
+        return self.goto_left_right(left=False)
     
     def copy(self, event=None):
         try:
@@ -82,7 +161,14 @@ class EntryPlus(tk.Entry):
             get = ""
         if not len(get):
             return 'break'
-        self.master._clipboard_append(get)
+        # Use the _clipboard_append method of the controller
+        # if passed, otherwise fall back to the master's
+        # clipboard_append which may not roll over to the
+        # system clipboard
+        if hasattr(self.controller,"_clipboard_append"):
+            self.controller._clipboard_append(get)
+        else:
+            self.master.clipboard_append(get)
         self.update()
         return 'break'
 
@@ -107,9 +193,8 @@ class EntryPlus(tk.Entry):
         return 'break'
 
 class EntryPopup(EntryPlus):
-    def __init__(self, parent, master, text, cell, column, **kw):
-        # tk.Entry.__init__(self, parent, **kw)
-        EntryPlus.__init__(self, parent, master, **kw)
+    def __init__(self, parent, master, controller, text, cell, column, **kw):
+        EntryPlus.__init__(self, parent, master, controller, **kw)
 
         self.original_text = text
         self.insert(0, text)
@@ -545,13 +630,13 @@ class PlistWindow(tk.Toplevel):
         r_label.grid(row=1,column=0,sticky="e")
         self.f_options = ["Key", "Boolean", "Data", "Date", "Number", "UID", "String"]
         self.find_type = self.f_options[0]
-        self.f_text = EntryPlus(self.find_frame,self)
+        self.f_text = EntryPlus(self.find_frame,self,self.controller)
         self.f_text.bind("<Return>", self.find_next)
         self.f_text.bind("<KP_Enter>", self.find_next)
         self.f_text.delete(0,tk.END)
         self.f_text.insert(0,"")
         self.f_text.grid(row=0,column=2,sticky="we",padx=10,pady=10)
-        self.r_text = EntryPlus(self.find_frame,self)
+        self.r_text = EntryPlus(self.find_frame,self,self.controller)
         self.r_text.bind("<Return>", self.replace)
         self.r_text.bind("<KP_Enter>", self.replace)
         self.r_text.delete(0,tk.END)
@@ -2176,7 +2261,7 @@ class PlistWindow(tk.Toplevel):
                     "cell":cell,
                 })
                 # Now we actually add it
-                self._tree.move(cell,task["from"],task.get("index","end"))
+                self._tree.move(cell,task["from"],task.get("index",tk.END))
                 selected = cell
             elif ttype == "move":
                 # We moved a cell - let's save the old info
@@ -2188,7 +2273,7 @@ class PlistWindow(tk.Toplevel):
                     "index":self._tree.index(cell)
                 })
                 # Let's actually move it now
-                self._tree.move(cell,task["from"],task.get("index","end"))
+                self._tree.move(cell,task["from"],task.get("index",tk.END))
         # Let's check if we have an r_task_list - and add it if it wasn't a one-off
         if len(r_task_list) and single_undo is None:
             r.append(r_task_list)
@@ -2596,33 +2681,7 @@ class PlistWindow(tk.Toplevel):
         return True
 
     def _clipboard_append(self, clipboard_string = None):
-        # Tkinter has issues copying to the system clipboard as evident in this bug report:
-        # https://bugs.python.org/issue40452
-        #
-        # There are some workarounds that require compiling a new tk binary - but we can
-        # ensure the system clipboard is updated by calling either clip or pbcopy depending
-        # on the current OS.
-        #
-        # First we clear the tkinter clipboard
-        self.clipboard_clear()
-        # Only write to the tkinter clipboard if we have a value
-        if clipboard_string: self.clipboard_append(clipboard_string)
-        else: clipboard_string = "" # Ensure we have at least an empty string
-        # Gather our args for the potential clipboard commands Windows -> macOS -> Linux
-        for args in (["clip"],) if os.name=="nt" else (["pbcopy"],) if sys.platform=="darwin" else (["xclip","-sel","c"],["xsel","-ib"],):
-            # Try to start a subprocess to mirror the tkinter clipboard contents
-            try:
-                clipboard = subprocess.Popen(
-                    args,
-                    stdin=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    stdout=subprocess.PIPE
-                )
-            except:
-                continue
-            # Dirty py2 check to see if we need to encode the data or not
-            clipboard.stdin.write(clipboard_string if 2/3==0 else clipboard_string.encode())
-            break # Break out of the loop as needed
+        self.controller._clipboard_append(clipboard_string=clipboard_string)
 
     def copy_selection(self, event = None):
         node = self._tree.focus()
@@ -2793,7 +2852,7 @@ class PlistWindow(tk.Toplevel):
             values = (self.get_type(value),children,"" if parentNode == "" else self.drag_code)
         else:
             values = (self.get_type(value),value,"" if parentNode == "" else self.drag_code)
-        i = self._tree.insert(parentNode, "end", text=key, values=values)
+        i = self._tree.insert(parentNode, tk.END, text=key, values=values)
         remaining = None
         if isinstance(value, dict):
             if (not check_binary or (check_binary and self.plist_type_string.get().lower() != "binary")) \
@@ -3318,7 +3377,7 @@ class PlistWindow(tk.Toplevel):
                     break
             if not found:
                 # Need to add it
-                current_cell = self._tree.insert(current_cell,"end",text=p,values=(self.menu_code+" "+needed_type,"",self.drag_code,),open=True)
+                current_cell = self._tree.insert(current_cell,tk.END,text=p,values=(self.menu_code+" "+needed_type,"",self.drag_code,),open=True)
                 undo_list.append({
                     "type":"add",
                     "cell":current_cell
@@ -3640,7 +3699,7 @@ class PlistWindow(tk.Toplevel):
             # Special formatting of hex values
             text = text.replace("<","").replace(">","")
         # place Entry popup properly
-        self.entry_popup = EntryPopup(self._tree, self, text, tv_item, column)
+        self.entry_popup = EntryPopup(self._tree, self, self.controller, text, tv_item, column)
         self.entry_popup.relocate()
         return 'break'
 
