@@ -418,6 +418,8 @@ class PlistWindow(tk.Toplevel):
 
         # Set up the options
         self.current_plist = None # None = new
+        self.last_saved = None
+        self.last_hash = None
         self.edited = False
         self.dragging = False
         self.drag_start = None
@@ -1307,7 +1309,13 @@ class PlistWindow(tk.Toplevel):
             mb.showerror("An Error Occurred While Opening {}".format(os.path.basename(self.current_plist)), repr(e),parent=self)
             return
         # We should have the plist data now
-        self.open_plist(self.current_plist,plist_data,plist_type=self.plist_type_string.get(),alternate=True)
+        self.open_plist(
+            self.current_plist,
+            plist_data,
+            auto_expand=self.controller.settings.get("expand_all_items_on_open",True),
+            plist_type=self.plist_type_string.get(),
+            alternate=True
+        )
 
     def get_min_max_from_match(self, match_text):
         # Helper method to take MatchKernel output and break it into the MinKernel and MaxKernel
@@ -2305,6 +2313,29 @@ class PlistWindow(tk.Toplevel):
         # only when the window specifically gained focus
         if event and event.widget == self:
             self.lift()
+            if self.controller.settings.get("warn_if_modified",True) \
+            and self.current_plist and os.path.isfile(self.current_plist) \
+            and self.last_saved and self.last_hash:
+                # We have a valid file and a save time - see if the file
+                # has been modified since then
+                try:
+                    last_modified = os.path.getmtime(self.current_plist)
+                    modified_hash = self.get_hash(self.current_plist)
+                except Exception:
+                    self.last_saved = self.last_hash = None
+                    return
+                if self.last_saved != last_modified and self.last_hash != modified_hash:
+                    # Update to avoid continually warning
+                    self.last_saved = last_modified
+                    self.last_hash  = modified_hash
+                    self.bell()
+                    if mb.askyesno(
+                        "File Was Modified",
+                        "{} was modified by another application, do you want to reload it from disk?".format(
+                            os.path.basename(self.current_plist)
+                        ),
+                        parent=self):
+                        self.reload_from_disk()
 
     def move_selection(self, event):
         # Check if we have a entry_popup - and relocate it
@@ -2643,6 +2674,11 @@ class PlistWindow(tk.Toplevel):
         path = os.path.normpath(path) if path else path
         # Retain the new path if the save worked correctly
         self.current_plist = path
+        try:
+            self.last_saved = os.path.getmtime(path)
+            self.last_hash  = save_hash
+        except Exception:
+            self.last_saved = self.last_hash = None # Reset them
         # Set the window title to the path
         self.title(path)
         # No changes - so we'll reset that
@@ -2655,6 +2691,11 @@ class PlistWindow(tk.Toplevel):
         self._tree.delete(*self._tree.get_children())
         self.add_node(plist_data,check_binary=plist_type.lower() == "binary")
         self.current_plist = os.path.normpath(path) if path else path
+        try:
+            self.last_saved = os.path.getmtime(path)
+            self.last_hash  = self.get_hash(path)
+        except Exception:
+            self.last_saved = self.last_hash = None
         if path is None:
             self._ensure_edited(title=title or "Untitled.plist")
         else:
