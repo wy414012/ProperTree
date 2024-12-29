@@ -812,6 +812,7 @@ class ProperTree:
                 # We pressed the button - but another check is in progress
                 self.tk.bell()
                 mb.showerror("Already Checking For Updates","An update check is already in progress.  If you consistently get this error when manually checking for updates - it may indicate a netowrk issue.")
+                self.lift_window()
             return
         self.is_checking_for_updates = True # Lock out other update checks
         self.update_button.configure(
@@ -852,6 +853,7 @@ class ProperTree:
             if user_initiated:
                 self.tk.bell()
                 mb.showerror(error,excep)
+                self.lift_window()
             return self.reset_update_button()
         # Parse the output returned
         version_dict = output_dict.get("json",{})
@@ -859,6 +861,7 @@ class ProperTree:
             if user_initiated:
                 self.tk.bell()
                 mb.showerror("An Error Occurred Checking For Updates","Data returned was malformed or nonexistent.")
+                self.lift_window()
             return self.reset_update_button()
         # At this point - we should have json data containing the version key/value
         check_version = str(version_dict["version"]).lower()
@@ -899,9 +902,7 @@ class ProperTree:
         # Reset the update button after notifying
         self.reset_update_button()
         # If we got here - we displayed some message, let's lift our window to the top
-        windows = self.stackorder(self.tk,include_defaults=True)
-        if not len(windows): return
-        self.lift_window(windows[-1])
+        self.lift_window()
 
     def get_best_tex_path(self):
         pt_path = os.path.abspath(os.path.dirname(__file__))
@@ -994,9 +995,7 @@ class ProperTree:
                     )
         self.reset_tex_button()
         # If we got here - we displayed some message, let's lift our window to the top
-        windows = self.stackorder(self.tk,include_defaults=True)
-        if not len(windows): return
-        self.lift_window(windows[-1])
+        self.lift_window()
 
     def handle_keypress(self, event, generate=True):
         if event.state & 0x2 and event.keysym != "Caps_Lock":
@@ -1330,14 +1329,14 @@ class ProperTree:
         self.update_canvases()
 
     def update_canvas_text(self, canvas = None):
-        if canvas == None: # Update all
+        if canvas is None: # Update all
             canvas = (self.bg_canvas,self.r1_canvas,self.r2_canvas,self.hl_canvas)
         if not isinstance(canvas, (tuple,list)): canvas = (canvas,)
         for c in canvas:
             if not c in self.canvas_connect: continue # Not a recognized canvas - skip
             # Update each canvas as needed - but mind the text color
             color = self.text_color(c["background"],self.canvas_connect[c]["invert"].get())
-            if self.canvas_connect[c].get("text_id",None) == None: # We haven't drawn it yet - try to
+            if self.canvas_connect[c].get("text_id",None) is None: # We haven't drawn it yet - try to
                 # Get the size
                 w = self.settings_window.winfo_width()
                 h = c.winfo_height()
@@ -1455,6 +1454,7 @@ class ProperTree:
         if not (os.path.exists(path) and os.path.isfile(path)):
             self.tk.bell()
             mb.showerror("An Error Occurred While Opening {}".format(os.path.basename(path)), "The path '{}' does not exist.".format(path))
+            self.lift_window()
             return
         return self.pre_open_with_path(path)
 
@@ -1472,7 +1472,7 @@ class ProperTree:
                     window = self.pre_open_with_path(p)
                     if not window: continue
                     at_least_one = True
-                    if self.start_window == None:
+                    if self.start_window is None:
                         self.start_window = window
                 if not at_least_one: # If none of them opened, open a fresh plist
                     windows = self.stackorder(self.tk)
@@ -1484,6 +1484,7 @@ class ProperTree:
         except Exception as e:
             self.tk.bell()
             mb.showerror("Error in check_open() function",repr(e))
+            self.lift_window()
         self.is_opening = False
 
     def open_plist_from_app(self, *args):
@@ -1503,17 +1504,18 @@ class ProperTree:
                     self.lift_window(existing_window)
                     existing_window.reload_from_disk(None)
                     continue
-                if len(windows) == 1 and windows[0] == self.start_window and windows[0].edited == False and windows[0].current_plist == None:
+                if len(windows) == 1 and windows[0] == self.start_window and windows[0].edited == False and windows[0].current_plist is None:
                     # Fresh window - replace the contents
                     current_window = windows[0]
                 else:
                     current_window = None
                 # Let's load the plist
                 window = self.pre_open_with_path(arg,current_window)
-                if self.start_window == None: self.start_window = window
+                if self.start_window is None: self.start_window = window
         except Exception as e:
             self.tk.bell()
             mb.showerror("Error in open_plist_from_app() function",repr(e))
+            self.lift_window()
         self.is_opening = False
 
     def change_hd_type(self, value):
@@ -1673,6 +1675,7 @@ class ProperTree:
             if [x for x in from_value if x.lower() not in "0123456789abcdef"]:
                 self.tk.bell()
                 mb.showerror("Invalid Hex Data","Invalid character in passed hex data.") # ,parent=self.tk)
+                self.lift_window()
                 return
         try:
             if from_type in ("decimal","binary"):
@@ -1729,6 +1732,7 @@ class ProperTree:
             self.t_text.configure(state='readonly')
             self.tk.bell()
             mb.showerror("Conversion Error",str(e)) # ,parent=self.tk)
+            self.lift_window()
 
     ###                       ###
     # Save/Load Plist Functions #
@@ -1880,7 +1884,7 @@ class ProperTree:
         if not path: return # Hmmm... shouldn't happen, but just in case
         path = os.path.abspath(os.path.expanduser(path))
         windows = self.stackorder(self.tk)
-        if current_window == None and len(windows) == 1 and windows[0] == self.start_window and windows[0].edited == False and windows[0].current_plist == None:
+        if current_window is None and len(windows) == 1 and windows[0] == self.start_window and windows[0].edited == False and windows[0].current_plist is None:
             # Fresh window - replace the contents
             current_window = windows[0]
         # Verify that no other window has that file selected already
@@ -1905,6 +1909,7 @@ class ProperTree:
             # Had an issue, throw up a display box
             self.tk.bell()
             mb.showerror("An Error Occurred While Opening {}".format(os.path.basename(path)), str(e)) # ,parent=current_window)
+            self.lift_window()
             return
         # Opened it correctly - let's load it, and set our values
         if not current_window:
@@ -1949,15 +1954,19 @@ class ProperTree:
         # Return the list, omitting any windows that are withdrawn
         return [x for x in stack_order if x.wm_state() != "withdrawn"]
 
-    def lift_window(self, window=None):
+    def lift_window(self, window=None, deiconify=False):
         if window is None:
             windows = self.stackorder(self.tk,include_defaults=True)
             if windows: # Get the last window we saw
                 window = windows[-1]
         if window is None: return # No windows in the stack order?
-        if window.state() == "iconic":
+        if deiconify and window.state() == "iconic":
             window.deiconify() # Lift minimized windows as well
-        window.lift()
+        if sys.platform != "darwin":
+            # For all non-macOS platforms, lift the window
+            # whether deiconifying or not.  Don't lift on
+            # macOS as it deiconifies windows.
+            window.lift()
         window.focus_force()
         try: window._tree.focus_force()
         except: pass
@@ -1990,7 +1999,7 @@ class ProperTree:
             for window in self.stackorder(self.tk)[::-1]:
                 if window in self.default_windows or not window.edited:
                     continue
-                self.lift_window(window)
+                self.lift_window(window,deiconify=True)
                 if not window.close_window(check_saving=ask_to_save,check_close=False):
                     self.is_quitting = False # Unlock the quit
                     return # User cancelled or we failed to save, bail

@@ -985,8 +985,16 @@ class PlistWindow(tk.Toplevel):
                 self._tree.focus_force()
 
     def hide_show_find(self, event=None, override=None):
+        if event and override is None and self.show_find_replace \
+        and not str(event.widget.focus_get()).startswith(str(self.find_frame)):
+            # We got a non-overridden ctrl/cmd-f event triggered from somewhere
+            # other than our find/replace pane while that pane already exists.
+            # Let's just force focus to the find entry widget - and select all
+            # contents
+            self.f_text.focus()
+            self.f_text.select_all()
         # Let's find out if we're set to show
-        if self.show_find_replace != override:
+        elif self.show_find_replace != override:
             self.show_find_replace ^= True
             self.draw_frames(event,"hideshow")
         return "break"
@@ -1679,7 +1687,7 @@ class PlistWindow(tk.Toplevel):
 
         # Now we need to walk the kexts
         kext_list = []
-        # We need to gather a list of all the files inside that and with .efi
+        # We need to check any directory whose name ends with .kext
         for path, subdirs, files in os.walk(oc_kexts):
             for name in sorted(subdirs, key=lambda x:x.lower()):
                 if name.startswith(".") or not name.lower().endswith(".kext"): continue
@@ -2338,7 +2346,7 @@ class PlistWindow(tk.Toplevel):
                     return
                 if self.last_hash != modified_hash:
                     # Update to avoid continually warning
-                    self.last_hash  = modified_hash
+                    self.last_hash = modified_hash
                     self.bell()
                     if mb.askyesno(
                         "File Was Modified",
@@ -2688,7 +2696,7 @@ class PlistWindow(tk.Toplevel):
         # Retain the new path if the save worked correctly
         self.current_plist = path
         try:
-            self.last_hash  = save_hash
+            self.last_hash = save_hash
         except Exception:
             self.last_hash = None # Reset them
         # Set the window title to the path
@@ -2704,7 +2712,7 @@ class PlistWindow(tk.Toplevel):
         self.add_node(plist_data,check_binary=plist_type.lower() == "binary")
         self.current_plist = os.path.normpath(path) if path else path
         try:
-            self.last_hash  = self.get_hash(path)
+            self.last_hash = self.get_hash(path)
         except Exception:
             self.last_hash = None
         if path is None:
@@ -3138,6 +3146,7 @@ class PlistWindow(tk.Toplevel):
             target = "" if not len(self._tree.selection()) else self._tree.selection()[0]
         if target in ("",self.get_root_node()):
             # Can't remove top level
+            self.removing_rows = False
             return
         parent = self._tree.parent(target)
         self.add_undo({
