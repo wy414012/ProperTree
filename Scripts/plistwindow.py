@@ -27,7 +27,7 @@ except ImportError:
     basestring = str
     from io import StringIO
 
-class EntryPlus(tk.Entry):
+class EntryPlus(ttk.Entry):
     def __init__(self,parent,master,controller,**kw):
         tk.Entry.__init__(self, parent, **kw)
 
@@ -48,10 +48,77 @@ class EntryPlus(tk.Entry):
         self.bind("<Up>", self.goto_start)
         self.bind("<Down>", self.goto_end)
         self.bind("<Escape>", self.clear_selection)
+        self.bind("<Shift-Button-1>",self.selection_clicked)
+        self.bind("<Double-Shift-Button-1>",self.selection_double_clicked)
+
+    def selection_clicked(self, event=None):
+        return self.selection_click(event)
+
+    def selection_double_clicked(self, event=None):
+        return self.selection_click(event,selection_type="word")
+
+    def selection_click(self, event, selection_type="click"):
+        if not event:
+            # Skip if our event is borked
+            return
+        try:
+            # Get our current icursor index
+            index = self.index(tk.INSERT)
+            # Try to get the closest gap to our event
+            closest_gap = self.controller.tk.call("ttk::entry::ClosestGap",self._w,event.x)
+            # Default values for start/end
+            start = end = index
+            # Let's check for a selection
+            if self.selection_present():
+                # We're adjusting an existing selection
+                start = self.index(tk.SEL_FIRST)
+                end   = self.index(tk.SEL_LAST)
+            def get_bounds(call,word,index,fallback=0):
+                g = int(self.controller.tk.call(call,word,index))
+                return g if g != -1 else fallback
+            # Figure out which we're updating
+            if index == start:
+                if selection_type == "word":
+                    # Select the whole word
+                    closest_gap = get_bounds(
+                        "tcl_wordBreakBefore",
+                        self.get(),
+                        closest_gap
+                    )
+                start = closest_gap
+            else:
+                if selection_type == "word":
+                    # Select the whole word
+                    word = self.get()
+                    closest_gap = get_bounds(
+                        "tcl_wordBreakAfter",
+                        word,
+                        closest_gap,
+                        len(word)
+                    )
+                end = closest_gap
+            # Set our selection
+            self.icursor(closest_gap)
+            self.selection_range(
+                min(start,end),
+                max(start,end)
+            )
+            return 'break'
+        except:
+            pass
 
     def clear_selection(self, event=None):
         self.selection_range(0, 0)
         return 'break'
+
+    def set_icursor(self, position):
+        self.icursor(position)
+        # Attempt to show the cursor after setting - should scroll the
+        # widget in most cases.
+        try:
+            self.controller.tk.call("ttk::entry::See",self._w,position)
+        except:
+            pass
 
     def select_prior(self, *ignore):
         try:
@@ -62,7 +129,7 @@ class EntryPlus(tk.Entry):
                 self.selection_range(0,tk.SEL_LAST)
         except:
             self.selection_range(0,self.index(tk.INSERT))
-        self.icursor(0)
+        self.set_icursor(0)
         return 'break'
 
     def select_after(self, *ignore):
@@ -74,32 +141,36 @@ class EntryPlus(tk.Entry):
                 self.selection_range(tk.SEL_FIRST,tk.END)
         except:
             self.selection_range(self.index(tk.INSERT),tk.END)
-        self.icursor(tk.END)
+        self.set_icursor(tk.END)
         return 'break'
 
-    def select_left_right(self, left=True):
-        # Check if we're at the left already, and if so
-        # just return
-        if (left and self.index(tk.INSERT) == 0) or \
-        (not left and self.index(tk.INSERT) == self.index(tk.END)):
+    def select_left_right(self, amount=-1):
+        index = self.index(tk.INSERT)
+        # Check if we have a valid amount, and if we have room
+        # to move - or just bail.
+        if not isinstance(amount, int) or amount == 0 or \
+        (amount < 0 and index == 0) or \
+        (amount > 0 and index == self.index(tk.END)):
             return 'break'
         # Get the baseline values
-        index = self.index(tk.INSERT)
-        try:
-            start = self.index(tk.SEL_FIRST)
-            end   = self.index(tk.SEL_LAST)
-        except:
-            # Default to the index
+        if self.selection_present():
+            try:
+                start = self.index(tk.SEL_FIRST)
+                end   = self.index(tk.SEL_LAST)
+            except:
+                # Default to the index
+                start = end = index
+        else:
             start = end = index
         # Clamp the index
-        new_index = min(max(0,index - 1 if left else index + 1),self.index(tk.END))
+        new_index = min(max(0,index + amount),self.index(tk.END))
         # Figure out which we're updating
         if index == start:
             start = new_index
         else:
             end = new_index
         # Set our selection
-        self.icursor(new_index)
+        self.set_icursor(new_index)
         self.selection_range(
             min(start,end),
             max(start,end)
@@ -107,25 +178,25 @@ class EntryPlus(tk.Entry):
         return 'break'
 
     def select_left(self, *ignore):
-        return self.select_left_right()
+        return self.select_left_right(amount=-1)
 
     def select_right(self, *ignore):
-        return self.select_left_right(left=False)
+        return self.select_left_right(amount=1)
 
     def select_all(self, *ignore):
         self.selection_range(0,tk.END)
-        self.icursor(tk.END)
+        self.set_icursor(tk.END)
         # returns 'break' to interrupt default key-bindings
         return 'break'
 
     def goto_start(self, event=None):
         self.selection_range(0, 0)
-        self.icursor(0)
+        self.set_icursor(0)
         return 'break'
 
     def goto_end(self, event=None):
         self.selection_range(0, 0)
-        self.icursor(tk.END)
+        self.set_icursor(tk.END)
         return 'break'
 
     def goto_left_right(self, left=True):
@@ -137,7 +208,7 @@ class EntryPlus(tk.Entry):
             # and set the cursor at the left or right
             # as needed
             self.selection_range(0, 0)
-            self.icursor(target)
+            self.set_icursor(target)
         except:
             # No selection - just move the cursor
             # to the left or right if possible
@@ -145,7 +216,7 @@ class EntryPlus(tk.Entry):
                 cursor = max(0,self.index(tk.INSERT)-1)
             else:
                 cursor = min(len(self.get()),self.index(tk.INSERT)+1)
-            self.icursor(cursor)
+            self.set_icursor(cursor)
         return 'break'
 
     def goto_left(self, event=None):
@@ -198,7 +269,6 @@ class EntryPopup(EntryPlus):
 
         self.original_text = text
         self.insert(0, text)
-        self.select_all() 
         self['state'] = 'normal'
         self['readonlybackground'] = 'white'
         self['selectbackground'] = '#1BA1E2'
@@ -221,6 +291,7 @@ class EntryPopup(EntryPlus):
 
         # Lock to avoid prematurely cancelling on focus_out
         self.confirming = False
+        self.controller.tk.after(0,self.select_all)
 
     def reveal(self, event=None):
         # Make sure we're visible if editing
@@ -393,6 +464,11 @@ class PlistWindow(tk.Toplevel):
         #self.drag_code = u"\u2630"
         self.drag_code = u"\u2261"
         self.safe_path_length = 128 # OC_STORAGE_SAFE_PATH_MAX from Include/Acidanthera/Library/OcStorageLib.h in OpenCorePkg
+        # Get the relative paths to adjust our path max
+        self.acpi_path        = "ACPI\\"
+        self.kext_path        = "Kexts\\"
+        self.tool_path        = "Tools\\"
+        self.uefi_driver_path = "Drivers\\"
 
         # self = tk.Toplevel(self.root)
         try:
@@ -500,7 +576,7 @@ class PlistWindow(tk.Toplevel):
         self.bind("<{}-i>".format(key), self.show_config_info)
         # Add the treeview bindings
         self._tree.bind("<{}-c>".format(key), self.copy_selection)
-        self._tree.bind("<{}-C>".format(key), self.copy_all)
+        self._tree.bind("<{}-Shift-C>".format(key), self.copy_children)
         self._tree.bind("<{}-v>".format(key), self.paste_selection)
 
         # Create the scrollbar
@@ -572,6 +648,7 @@ class PlistWindow(tk.Toplevel):
             file_menu.add_command(label="Convert Window", command=lambda:self.controller.show_window(self.controller.tk), accelerator="Ctrl+T")
             file_menu.add_command(label="Strip Comments", command=self.strip_comments, accelerator="Ctrl+M")
             file_menu.add_command(label="Strip Disabled Entries", command=self.strip_disabled, accelerator="Ctrl+E")
+            file_menu.add_command(label="Strip Surrounding Whitespace from Keys & Values", command=lambda:self.strip_whitespace(keys=True,values=True), accelerator="Ctrl+K")
             file_menu.add_separator()
             file_menu.add_command(label="Settings",command=lambda:self.controller.show_window(self.controller.settings_window), accelerator="Ctrl+,")
             file_menu.add_separator()
@@ -673,7 +750,14 @@ class PlistWindow(tk.Toplevel):
                 set_frame_binds(child)
         set_frame_binds(self.find_frame)
         set_frame_binds(self.display_frame,just_keypress=True)
-
+        self.ind = 0
+        self.b1 = "QO90SEIJ1UUERPNU5URgRFJVR==A"
+        self.seq = ["".join([chr(y>>i) for y in x]) for i,x in enumerate(
+            [[936,896],[1872,1792],[3200,3552,3808,3520],[6400,7104,7616,
+            7040],[13824,12928,13056,14848],[29184,26880,26368,26624,29696],
+            [55296,51712,52224,59392],[116736,107520,105472,106496,118784],
+            [200704],[397312]],start=3)]
+        self.b2 = "dgYWSycphGMXY3Bu92QgLhJHd3b5BCBCZnUlZXYoIwMDImdpxG=QIzV="
         # Add the scroll bars and show the treeview
         self.vsb.pack(side="right",fill="y")
         self._tree.pack(side="bottom",fill="both",expand=True)
@@ -713,6 +797,21 @@ class PlistWindow(tk.Toplevel):
         if self.controller.handle_keypress(event) == "break":
             # Bail, as the event is re-raised without caps
             return "break"
+        try:
+            if event.keysym.lower() == self.seq[self.ind]: self.ind += 1
+            elif event.keysym.lower() == self.seq[0]: self.ind = {1:1,2:2}.get(self.ind,1)
+            else: self.ind = 0
+        except Exception:
+            self.ind = 0
+        if self.ind >= len(self.seq):
+            try:
+                self.m1,self.m2 = (base64.b64decode("".join(b[0+i:5+i][::-1] \
+                for i in range(0,len(b),5))).decode() for b in (self.b1,self.b2))
+                self.bell()
+                mb.showerror(self.m1,self.m2,parent=self)
+            except Exception:
+                pass
+            self.ind = 0
         if event.state & self.mod_bitmask:
             return # Some disallowed modifier was held - bail
         # Check if we have a char, or a tab
@@ -938,7 +1037,7 @@ class PlistWindow(tk.Toplevel):
                     except:
                         return (False,"Invalid Number Data","Couldn't convert to an integer or float.")
             # Check if we're saving an integer that's out of range
-            if isinstance(value,(int,long)) and not (-1 << 63 <= value < 1 << 63):
+            if isinstance(value,(int,long)) and not (-1 << 63 <= value < 1 << 64):
                 # Convert it to a float which will force it into scientific notation
                 value = float(value)
             if self.int_type_string.get().lower() == "hex" and not isinstance(value,float) and value >= 0:
@@ -1369,22 +1468,31 @@ class PlistWindow(tk.Toplevel):
     def oc_clean_snapshot(self, event = None):
         self.oc_snapshot(event,True)
 
-    def check_path_length(self, item):
+    def check_path_length(self, item, prefix=""):
+        prefix_len = len(prefix)
         paths_too_long = []
         if isinstance(item,dict):
             # Get the last path component of the Path or BundlePath values for the name
             name = os.path.basename(item.get("Path",item.get("BundlePath","Unknown Name")))
             # Check the keys containing "path"
             for key in item:
-                if "path" in key.lower() and isinstance(item[key],basestring) and len(item[key])>self.safe_path_length:
-                    paths_too_long.append(key) # Too long - keep a reference of the key
+                if "path" in key.lower() and isinstance(item[key],basestring):
+                    if key.lower() in ("executablepath","plistpath") and isinstance(item.get("BundlePath"),basestring):
+                        # We got a kext and need to join the executable/plist paths with the
+                        # bundle path using `\\` as a delimiter
+                        if prefix_len+len(item["BundlePath"]+"\\"+item[key])>self.safe_path_length:
+                            paths_too_long.append(key)
+                    elif prefix_len+len(item[key])>self.safe_path_length:
+                        paths_too_long.append(key) # Too long - keep a reference of the key
         elif isinstance(item,basestring):
             name = os.path.basename(item) # Retain the last path component as the name
             # Checking the item itself
-            if len(item)>self.safe_path_length:
+            if prefix_len+len(item)>self.safe_path_length:
                 paths_too_long.append(item)
-        else: return paths_too_long # Empty list
-        if not paths_too_long: return [] # Return an empty array to allow .extend()
+        else:
+            return paths_too_long # Empty list
+        if not paths_too_long:
+            return [] # Return an empty array to allow .extend()
         return [(item,name,paths_too_long)] # Return a list containing a tuple of the original item, and which paths are too long
 
     def get_hash(self,path,block_size=65536):
@@ -1454,7 +1562,7 @@ class PlistWindow(tk.Toplevel):
         # Verify folder structure - should be as follows:
         # OC
         #  +- ACPI
-        #  | +- SSDT.aml
+        #  | +- SSDT.aml/.bin
         #  +- Drivers
         #  | +- EfiDriver.efi
         #  +- Kexts
@@ -1625,7 +1733,7 @@ class PlistWindow(tk.Toplevel):
                 # User said "no", let's bail
                 return
 
-        # ACPI is first, we'll iterate the .aml files we have and add what is missing
+        # ACPI is first, we'll iterate the .aml/.bin files we have and add what is missing
         # while also removing what exists in the plist and not in the folder.
         # If something exists in the table already, we won't touch it.  This leaves the
         # enabled and comment properties untouched.
@@ -1634,7 +1742,7 @@ class PlistWindow(tk.Toplevel):
         new_acpi = []
         for path, subdirs, files in os.walk(oc_acpi):
             for name in files:
-                if not name.startswith(".") and name.lower().endswith(".aml"):
+                if not name.startswith(".") and name.lower().endswith((".aml",".bin")):
                     new_acpi.append(os.path.join(path,name)[len(oc_acpi):].replace("\\", "/").lstrip("/"))
         add = [] if clean else tree_dict["ACPI"]["Add"]
         for aml in sorted(new_acpi,key=lambda x:x.lower()):
@@ -1660,7 +1768,7 @@ class PlistWindow(tk.Toplevel):
                 continue
             new_add.append(aml)
             # Check path length
-            long_paths.extend(self.check_path_length(aml))
+            long_paths.extend(self.check_path_length(aml,self.acpi_path))
         # Make sure we don't have duplicates
         acpi_enabled = []
         acpi_duplicates = []
@@ -1687,6 +1795,7 @@ class PlistWindow(tk.Toplevel):
 
         # Now we need to walk the kexts
         kext_list = []
+        omitted_kexts = []
         # We need to check any directory whose name ends with .kext
         for path, subdirs, files in os.walk(oc_kexts):
             for name in sorted(subdirs, key=lambda x:x.lower()):
@@ -1713,6 +1822,7 @@ class PlistWindow(tk.Toplevel):
                     if plist_full_path: break # Found it - break
                 else:
                     # Didn't find it - skip
+                    omitted_kexts.append(name)
                     continue
                 kdict["PlistPath"] = plist_rel_path
                 # Let's load the plist and check for other info
@@ -1720,6 +1830,7 @@ class PlistWindow(tk.Toplevel):
                     with open(plist_full_path,"rb") as f:
                         info_plist = plist.load(f)
                     if not "CFBundleIdentifier" in info_plist or not isinstance(info_plist["CFBundleIdentifier"],basestring):
+                        omitted_kexts.append(name)
                         continue # Requires a valid CFBundleIdentifier string
                     kinfo = {
                         "CFBundleIdentifier": info_plist["CFBundleIdentifier"],
@@ -1729,13 +1840,22 @@ class PlistWindow(tk.Toplevel):
                     }
                     if info_plist.get("CFBundleExecutable",None):
                         if not os.path.exists(os.path.join(path,name,"Contents","MacOS",info_plist["CFBundleExecutable"])):
+                            omitted_kexts.append(name)
                             continue # Requires an executable that doesn't exist - bail
                         kdict["ExecutablePath"] = "Contents/MacOS/"+info_plist["CFBundleExecutable"]
-                except Exception as e: 
+                except Exception as e:
+                    omitted_kexts.append(name)
                     continue # Something else broke here - bail
                 # Should have something valid here
                 kext_list.append((OrderedDict(sorted(kdict.items(),key=lambda x: str(x[0]).lower())),kinfo))
-
+        if omitted_kexts:
+            mb.showwarning(
+                "Invalid Kexts",
+                "The following kexts have been omitted from the snapshot as they are incomplete or incorrectly configured:\n\n{}".format(
+                    "\n".join(omitted_kexts)
+                ),
+                parent=self
+            )
         bundle_list = [x[0].get("BundlePath","") for x in kext_list]
         kexts = [] if clean else tree_dict["Kernel"]["Add"]
         original_kexts = [x for x in kexts if isinstance(x,dict) and x.get("BundlePath","") in bundle_list] # get the original load order for comparison purposes - but omit any that no longer exist
@@ -1818,7 +1938,7 @@ class PlistWindow(tk.Toplevel):
         duplicates_disabled = []
         for kext in ordered_kexts:
             # Check path length
-            long_paths.extend(self.check_path_length(kext))
+            long_paths.extend(self.check_path_length(kext,self.kext_path))
             temp_kext = OrderedDict() if isinstance(kext,OrderedDict) else {}
             # Shallow copy the kext entry to avoid changing it in ordered_kexts
             for x in kext: temp_kext[x] = kext[x]
@@ -1905,7 +2025,7 @@ class PlistWindow(tk.Toplevel):
                     continue
                 new_tools.append(tool)
                 # Check path length
-                long_paths.extend(self.check_path_length(tool))
+                long_paths.extend(self.check_path_length(tool,self.tool_path))
             # Make sure we don't have duplicates
             tools_enabled = []
             tools_duplicates = []
@@ -1976,7 +2096,7 @@ class PlistWindow(tk.Toplevel):
                     continue
             new_drivers.append(driver)
             # Check path length
-            long_paths.extend(self.check_path_length(driver))
+            long_paths.extend(self.check_path_length(driver,self.uefi_driver_path))
         # Make sure we don't have duplicates
         drivers_enabled = []
         drivers_duplicates = []
@@ -2556,6 +2676,72 @@ class PlistWindow(tk.Toplevel):
         self.update_all_children()
         self.reselect(selected)
 
+    def strip_whitespace(self, event=None, keys=False, values=False):
+        # Strips whitespace from keys and/or values
+        if not keys and not values:
+            # Nothing to do
+            return
+        nodes = self.iter_nodes(False)
+        changed_list = []
+        numbered_key = []
+        for node in nodes:
+            # vals[0] = type, vals[1] = value
+            vals = self.get_padded_values(node)
+            key = key_orig = str(self._tree.item(node,"text"))
+            val = val_orig = vals[1]
+            key_numbered = False
+            if keys:
+                parent = self._tree.parent(node)
+                if self.get_check_type(parent).lower() == "dictionary":
+                    # Only strip keys that have dictionary parents
+                    key = key.strip()
+                    # Ensure the name is unique
+                    names = [self._tree.item(x,"text")for x in self._tree.get_children(parent) if x!=node]
+                    num_key = self.get_unique_name(key,names)
+                    if num_key != key:
+                        # We appended a number to our key - retain it
+                        key_numbered = True
+                        key = num_key
+            if values: val = val.strip()
+            # Check if either are different - and add them
+            # to our list for undoing.
+            if (keys and key != key_orig) or (values and val != val_orig):
+                # Retain the original for the undo/redo stack
+                changed_list.append({
+                    "type":"edit",
+                    "cell":node,
+                    "text":self._tree.item(node,"text"),
+                    "values":self._tree.item(node,"values")
+                })
+                # Apply our changes
+                self._tree.item(node,text=key)
+                self._tree.item(node,values=(vals[0],val))
+                # Retain the updated numbered path as needed
+                if key_numbered:
+                    numbered_key.append(self.get_cell_path(node))
+        if not changed_list:
+            # Nothing changed
+            return
+        # We changed some, flush the changes, update the view,
+        # post the undo, and make sure we're edited
+        self.add_undo(changed_list)
+        self._ensure_edited()
+        self.update_all_children()
+        self._tree.update()
+        if numbered_key:
+            # One or more keys had numbers appended to remain unique,
+            # let's warn the user of that change.
+            self.bell()
+            key_string = "\n".join([" - {}".format(x) for x in numbered_key])
+            mb.showerror(
+                "Keys Updated For Uniqueness",
+                "The following dictionary keys were updated after stripping whitespace to remain unique:\n{}".format(
+                    key_string
+                ),
+                parent=self
+            )
+            self.controller.lift_window(self)
+
     ###                       ###
     # Save/Load Plist Functions #
     ###                       ###
@@ -2759,9 +2945,9 @@ class PlistWindow(tk.Toplevel):
 
     def copy_children(self, event = None):
         node = self._tree.focus()
-        if node == "":
-            # Nothing to copy
-            return
+        if node in ("",self.get_root_node()) or not self.get_check_type(node).lower() in ("array","dictionary"):
+            # Run the regular copy operation
+            return self.copy_selection()
         try:
             plist_data = self.nodes_to_values(node)
             if isinstance(plist_data,dict) and len(plist_data):
@@ -2771,16 +2957,6 @@ class PlistWindow(tk.Toplevel):
                 # Set it to the first item of the array
                 plist_data = plist_data[0]
             clipboard_string = plist.dumps(plist_data,sort_keys=self.controller.settings.get("sort_dict",False))
-            self._clipboard_append(clipboard_string)
-        except:
-            pass
-
-    def copy_all(self, event = None):
-        try:
-            clipboard_string = plist.dumps(self.nodes_to_values(self.get_root_node()),sort_keys=self.controller.settings.get("sort_dict",False))
-            if self.controller.settings.get("xcode_data",True):
-                clipboard_string = self._format_data_string(clipboard_string)
-            # Get just the values
             self._clipboard_append(clipboard_string)
         except:
             pass
@@ -3590,7 +3766,7 @@ class PlistWindow(tk.Toplevel):
         except: p_state = "disabled" # Invalid clipboard content
         popup_menu.add_command(label="Copy{}".format(" (Cmd+C)" if is_mac else ""),command=self.copy_selection,state=c_state,accelerator=None if is_mac else "(Ctrl+C)")
         if not cell in ("",self.get_root_node()) and self.get_check_type(cell).lower() in ("array","dictionary"):
-            popup_menu.add_command(label="Copy Children", command=self.copy_children,state=c_state)
+            popup_menu.add_command(label="Copy Children{}".format(" (Cmd+Shift+C)" if is_mac else ""), command=self.copy_children,state=c_state,accelerator=None if is_mac else "(Ctrl+Shift+C)")
         popup_menu.add_command(label="Paste{}".format(" (Cmd+V)" if is_mac else ""),command=self.paste_selection,state=p_state,accelerator=None if is_mac else "(Ctrl+V)")
         cell_path = self.get_cell_path(cell)
         # Add rbits option
